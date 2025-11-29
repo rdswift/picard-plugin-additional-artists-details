@@ -1,0 +1,16 @@
+uuid = "81fd1f5f-f723-498f-a82e-17fb4163c83a"
+name = "Additional Artists Details"
+authors = ["Bob Swift"]
+version = "0.6"
+description = """
+This plugin provides specialized album and track variables with artist details for use in tagging and naming scripts.
+"""
+api = ['3.0']
+license = "GPL-2.0-or-later"
+license_url = "https://www.gnu.org/licenses/gpl-2.0.html"
+long_description = """
+This plugin provides specialized album and track variables with artist details for use in tagging and naming scripts.  Note that this creates
+additional calls to the MusicBrainz API for the artist and area information, and this will slow down processing.  This will be particularly
+noticable when there are many different album or track artists, such as on a [Various Artists] release.  There is an option to disable track
+artist processing, which can significantly increase the processing speed if you are only interested in album artist details.
+"""
