@@ -604,8 +604,6 @@ def enable(api: PluginApi):
     api.register_options_page(AdditionalArtistsDetailsOptionsPage)
     api.register_album_post_removal_processor(plugin.remove_album)
 
-    # Register the plugin to run at a LOW priority so that other plugins that
-    # modify the artist information can complete their processing and this plugin
-    # is working with the latest updated data.
-    api.register_album_metadata_processor(plugin.make_album_vars, priority=-100)
-    api.register_track_metadata_processor(plugin.make_track_vars, priority=-100)
+    # Register the plugin to run at a high priority.
+    api.register_album_metadata_processor(plugin.make_album_vars, priority=100)
+    api.register_track_metadata_processor(plugin.make_track_vars, priority=100)
