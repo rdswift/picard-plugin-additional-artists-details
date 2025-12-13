@@ -1,4 +1,3 @@
-"options.page_title" = "Additional Artists Details"
 "ui.cb_area_county" = "Include location county"
 "ui.cb_area_municipality" = "Include location municipality"
 "ui.cb_area_subdivision" = "Include location subdivision"
@@ -9,3 +8,4 @@
 "ui.gb_process_track_artists" = "Process Track Artists"
 "ui.label_details" = "<html><head/><body><p>This option determines whether or not County, Municipality and Subdivision information is included in the artist location variables created. Regardless of these settings, this information will be included if a County, Municipality or Subdivision is the area specified for an artist.</p></body></html>"
 "ui.label_track_artists" = "<html><head/><body><p>This option determines whether or not details are retrieved for all track artists on the release. If you are only interested in details for the album artists then this should be disabled, thus significantly reducing the number of additional calls made to the MusicBrainz api and reducing the time required to load a release. Album artists are always processed.</p></body></html>"
+"ui.title" = "Additional Artists Details"
