@@ -28,6 +28,7 @@ from collections import namedtuple
 from functools import partial
 from typing import Callable
 
+from picard.config import get_config
 from picard.plugin3.api import (
     Album,
     Metadata,
@@ -67,11 +68,13 @@ AREA = 'area'
 AREA_REQUESTS = 'area_requests'
 ISO_CODES_1 = 'iso-3166-1-codes'
 ISO_CODES_2 = 'iso-3166-2-codes'
+TRACKS = 'tracks'
+
+# Option settings
 OPT_AREA_COUNTY = 'area_county'
 OPT_AREA_MUNICIPALITY = 'area_municipality'
 OPT_AREA_SUBDIVISION = 'area_subdivision'
 OPT_PROCESS_TRACKS = 'process_tracks'
-TRACKS = 'tracks'
 
 PLUGIN_NAME = "Additional Artists Details"
 
@@ -634,10 +637,14 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
 
 def enable(api: PluginApi):
     """Called when plugin is enabled."""
+    # Initialize settings
     api.plugin_config.register_option(OPT_PROCESS_TRACKS, False)
     api.plugin_config.register_option(OPT_AREA_COUNTY, True)
     api.plugin_config.register_option(OPT_AREA_MUNICIPALITY, True)
     api.plugin_config.register_option(OPT_AREA_SUBDIVISION, True)
+
+    # Migrate settings from 2.x version if available
+    migrate_settings(api)
 
     plugin = ArtistDetailsPlugin(api)
     api.register_options_page(AdditionalArtistsDetailsOptionsPage)
@@ -646,3 +653,25 @@ def enable(api: PluginApi):
     # Register the plugin to run at a high priority.
     api.register_album_metadata_processor(plugin.make_album_vars, priority=100)
     api.register_track_metadata_processor(plugin.make_track_vars, priority=100)
+
+
+def migrate_settings(api: PluginApi):
+    cfg = get_config()
+    if cfg.setting.raw_value('aad_process_tracks') is None:
+        return
+
+    api.logger.info("Migrating settings from 2.x version.")
+
+    mapping = [
+        ('aad_process_tracks', OPT_PROCESS_TRACKS, bool),
+        ('aad_area_county', OPT_AREA_COUNTY, bool),
+        ('aad_area_municipality', OPT_AREA_MUNICIPALITY, bool),
+        ('aad_area_subdivision', OPT_AREA_SUBDIVISION, bool),
+    ]
+
+    for old_key, new_key, qtype in mapping:
+        if cfg.setting.raw_value(old_key) is None:
+            api.logger.debug("No old setting for key: '%s'", old_key,)
+            continue
+        api.plugin_config[new_key] = cfg.setting.raw_value(old_key, qtype=qtype)
+        cfg.setting.remove(old_key)
