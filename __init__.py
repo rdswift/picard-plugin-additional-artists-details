@@ -18,11 +18,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 
-# pylint: disable=line-too-long
-# pylint: disable=import-error
-# pylint: disable=too-many-arguments
-# pylint: disable=too-many-locals
-
 
 from collections import namedtuple
 from functools import partial
@@ -74,8 +69,6 @@ OPT_AREA_COUNTY = 'area_county'
 OPT_AREA_MUNICIPALITY = 'area_municipality'
 OPT_AREA_SUBDIVISION = 'area_subdivision'
 OPT_PROCESS_TRACKS = 'process_tracks'
-
-PLUGIN_NAME = "Additional Artists Details"
 
 
 class CustomHelper(MBAPIHelper):
@@ -212,7 +205,7 @@ class ArtistDetailsPlugin:
             # prevent scripts from using partially initialized variables and avoid warning about
             # it already having been executed.
 
-            album._finalize_loading(None)   # pylint: disable=protected-access
+            album._finalize_loading(None)
 
     def remove_album(self, _api: PluginApi, album: Album):
         """Remove the album from the albums processing dictionary.
@@ -538,7 +531,6 @@ class ArtistDetailsPlugin:
         Returns:
             tuple: The two-character country code and full location description for the area.
         """
-        # pylint: disable=too-many-boolean-expressions
         country = ''
         location = []
         i = 7   # Counter to avoid potential runaway processing
@@ -567,55 +559,13 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
     """
 
     TITLE = t_("ui.title", "Additional Artists Details")
+    HELP_URL = USER_GUIDE_URL
 
     def __init__(self, parent=None):
         super(AdditionalArtistsDetailsOptionsPage, self).__init__(parent)
 
         self.ui = Ui_AdditionalArtistsDetailsOptionsPage()
         self.ui.setupUi(self)
-
-        # Add translations
-        self.ui.gb_description.setTitle(self.api.tr("ui.gb_description", "Additional Artists Details"))
-        self.ui.format_description.setText(
-            self.api.tr(
-                "ui.format_description",
-                (
-                    "<html><head/><body><p>These settings will determine how the <span style=\" font-weight:600;\">Additional "
-                    "Artists Details</span> plugin operates.</p><p>Please see the <a href=\"{url}\"><span style=\" text-decoration: "
-                    "underline; color:#0000ff;\">User Guide</span></a> for additional information.</p></body></html>"
-                )
-            ).format(url=USER_GUIDE_URL)
-        )
-        self.ui.gb_process_track_artists.setTitle(self.api.tr("ui.gb_process_track_artists", "Process Track Artists"))
-        self.ui.label.setText(
-            self.api.tr(
-                "ui.label_track_artists",
-                (
-                    "<html><head/><body><p>This option determines whether or not details are retrieved for all track artists on the "
-                    "release. If you are only interested in details for the album artists then this should be disabled, thus "
-                    "significantly reducing the number of additional calls made to the MusicBrainz api and reducing the time required "
-                    "to load a release. Album artists are always processed.</p></body></html>"
-                )
-            )
-        )
-        self.ui.cb_process_tracks.setText(self.api.tr("ui.cb_process_tracks", "Process track artists"))
-        self.ui.gb_area_details.setTitle(self.api.tr("ui.gb_area_details", "Include Area Details"))
-        self.ui.label_2.setText(
-            self.api.tr(
-                "ui.label_details",
-                (
-                    "<html><head/><body><p>This option determines whether or not County, Municipality and Subdivision information is "
-                    "included in the artist location variables created. Regardless of these settings, this information will be included "
-                    "if a County, Municipality or Subdivision is the area specified for an artist.</p></body></html>"
-                )
-            )
-        )
-        self.ui.cb_area_county.setText(self.api.tr("ui.cb_area_county", "Include location county"))
-        self.ui.cb_area_municipality.setText(self.api.tr("ui.cb_area_municipality", "Include location municipality"))
-        self.ui.cb_area_subdivision.setText(self.api.tr("ui.cb_area_subdivision", "Include location subdivision"))
-
-        # Enable external link
-        self.ui.format_description.setOpenExternalLinks(True)
 
     def load(self):
         """Load the option settings.
