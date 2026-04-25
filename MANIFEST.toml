@@ -13,6 +13,7 @@ artist processing, which can significantly increase the processing speed if you 
 """
 categories = ["metadata"]
 homepage = "https://picard-plugins-user-guides.readthedocs.io/en/latest/additional_artists_details/user_guide.html"
+report_bugs_to = "https://github.com/rdswift/picard-plugin-additional-artists-details/issues"
 
 [name_i18n]
 de = "Weitere Details zu den Künstlern"
