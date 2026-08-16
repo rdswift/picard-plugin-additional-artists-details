@@ -1,6 +1,6 @@
-"""Additional Artists Details
-"""
-# Copyright (C) 2023-2025 Bob Swift (rdswift)
+"""Additional Artists Details"""
+
+# Copyright (C) 2023-2026 Bob Swift (rdswift)
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@ from picard.plugin3.api import (
     Metadata,
     OptionsPage,
     PluginApi,
+    Track,
     t_,
 )
 from picard.webservice.api_helpers import MBAPIHelper
@@ -229,7 +230,7 @@ class ArtistDetailsPlugin:
             self.api.logger.info("Track artist processing is disabled.")
         self._artist_processing(artists, album, album_metadata, 'Album')
 
-    def make_track_vars(self, _api: PluginApi, album: Album, album_metadata: Metadata,
+    def make_track_vars(self, _api: PluginApi, track: Track, album_metadata: Metadata,
                         track_metadata: dict, _release_metadata: dict):
         """Process track artists.
 
@@ -242,6 +243,7 @@ class ArtistDetailsPlugin:
         """
         artists = set()
         source_type = 'track'
+        album = track.album
         # Test for valid metadata node.
         # The 'artist-credit' key should always be there.
         # This check is to avoid a runtime error if it doesn't exist for some reason.
