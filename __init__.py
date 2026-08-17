@@ -193,17 +193,42 @@ class ArtistDetailsPlugin:
         Args:
             album (api.Album): The Album object to use for the processing.
         """
-        if album.id not in self.album_processing_count:
-            self.album_processing_count[album.id] = 1
-        self.album_processing_count[album.id] -= 1
-        if self._get_album_area_request_count(album.id) < 1:
-            self._save_artist_metadata(album.id)
 
-            # TODO: Find a way to avoid execution of `_finalize_loading` until triggered here to
-            # prevent scripts from using partially initialized variables and avoid warning about
-            # it already having been executed.
 
-            album._finalize_loading(None)
+
+        self._save_artist_metadata(album)
+        print(f"\n\n\nFinalizing loading of album: {album}\n")
+        for _task in album.get_pending_tasks().values():
+            print(f"Pending: {_task.description}")
+        print("\n\n")
+        album._finalize_loading(None)
+
+
+
+
+
+
+        # if album.id not in self.album_processing_count:
+        #     self.album_processing_count[album.id] = 1
+        # self.album_processing_count[album.id] -= 1
+        # if self._get_album_area_request_count(album.id) < 1:
+        #     self._save_artist_metadata(album.id)
+
+        #     # TODO: Find a way to avoid execution of `_finalize_loading` until triggered here to
+        #     # prevent scripts from using partially initialized variables and avoid warning about
+        #     # it already having been executed.
+
+
+
+        #     print(f"\n\n\nFinalizing loading of album: {album}\n")
+        #     for _task in album.get_pending_tasks().values():
+        #         print(f"Pending: {_task.description}")
+        #     print("\n\n")
+
+
+
+        #     album._finalize_loading(None)
+        #     # album._finalize_loading_album()
 
     def remove_album(self, _api: PluginApi, album: Album):
         """Remove the album from the albums processing dictionary.
@@ -278,23 +303,27 @@ class ArtistDetailsPlugin:
             else:
                 self.api.logger.debug('%s artist ID %s information available from cache.', source_type, temp_id)
         self._add_target(album.id, artists, destination_metadata)
-        self._save_artist_metadata(album.id)
+        self._save_artist_metadata(album)
 
-    def _save_artist_metadata(self, album_id: str):
+    def _save_artist_metadata(self, album: Album):
         """Saves the new artist details variables to the metadata targets for the specified album.
 
         Args:
             album_id (str): MBID of the album to process.
         """
-        if album_id in self.album_processing_count and self.album_processing_count[album_id]:
+        if album.get_pending_tasks():
             return
+        album_id = album.id
 
-        if self._get_album_area_request_count(album_id) > 0:
-            return
+        # if album_id in self.album_processing_count and self.album_processing_count[album_id]:
+        #     return
 
-        if album_id not in self.albums or not self.albums[album_id][TRACKS]:
-            self.api.logger.error("No metadata targets found for album '%s'", album_id)
-            return
+        # if self._get_album_area_request_count(album_id) > 0:
+        #     return
+
+        # if album_id not in self.albums or not self.albums[album_id][TRACKS]:
+        #     self.api.logger.error("No metadata targets found for album '%s'", album_id)
+        #     return
 
         for item in self.albums[album_id][TRACKS]:
             # Add album artists to track so they are available in the metadata
@@ -333,22 +362,25 @@ class ArtistDetailsPlugin:
             album (api.Album): The Album object to use for the processing.
         """
         self._album_add_request(album)
+        task_id = f"Artist={artist_id}"
         helper = CustomHelper(album.tagger.webservice)
         handler = partial(
             self._artist_submission_handler,
             artist=artist_id,
             album=album,
+            task_id=task_id,
         )
 
         return self.api.add_album_task(
             album=album,
-            task_id=f"Artist={artist_id}",
+            task_id=task_id,
             description=f"Get info for artist: {artist_id}",
             timeout=10.,
-            request_factory=lambda: helper.get_artist_by_id(artist_id, handler)
+            request_factory=lambda: helper.get_artist_by_id(artist_id, handler),
+            blocking=True,
         )
 
-    def _artist_submission_handler(self, document, _reply, error, artist=None, album=None):
+    def _artist_submission_handler(self, document, _reply, error, artist=None, album=None, task_id=None):
         """Handles the response from the webservice requests for artist information.
         """
         try:
@@ -376,6 +408,7 @@ class ArtistDetailsPlugin:
             self.result_cache[ARTIST][artist] = artist_info
 
         finally:
+            self.api.complete_album_task(album=album, task_id=task_id)
             self._album_remove_request(album)
 
     def _get_area_info(self, area_id, album: Album):
@@ -385,6 +418,7 @@ class ArtistDetailsPlugin:
             area_id (str): MBID of the area to retrieve.
             album (api.Album): The Album object to use for the processing.
         """
+        task_id = f"Area={area_id}"
         self.result_cache[AREA_REQUESTS].add(area_id)
         self._album_add_request(album)
         self._add_album_area_request(album.id, area_id)
@@ -394,17 +428,19 @@ class ArtistDetailsPlugin:
             self._area_submission_handler,
             area=area_id,
             album=album,
+            task_id=task_id,
         )
 
         return self.api.add_album_task(
             album=album,
-            task_id=f"Area={area_id}",
+            task_id=task_id,
             description=f"Get info for area: {area_id}",
             timeout=10.,
-            request_factory=lambda: helper.get_area_by_id(area_id, handler)
+            request_factory=lambda: helper.get_area_by_id(area_id, handler),
+            blocking=True,
         )
 
-    def _area_submission_handler(self, document, _reply, error, area=None, album=None):
+    def _area_submission_handler(self, document, _reply, error, area=None, album=None, task_id=None):
         """Handles the response from the webservice requests for area information.
         """
         try:
@@ -423,6 +459,7 @@ class ArtistDetailsPlugin:
                     self._parse_area_relation(_id, rel, album, name, _type, type_text)
 
         finally:
+            self.api.complete_album_task(album=album, task_id=task_id)
             self._remove_album_area_request(album.id, area)
             self._album_remove_request(album)
 
