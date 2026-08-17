@@ -20,6 +20,7 @@ from collections import namedtuple
 from functools import partial
 from typing import Callable
 
+from picard.debug_opts import DebugOpt
 from picard.plugin3.api import (
     Album,
     Metadata,
@@ -130,24 +131,36 @@ class ArtistDetailsPlugin:
     albums = {}
     album_area_requests: dict[str, set] = {}
 
-    def __init__(self, api: PluginApi):
+    def __init__(self, api: PluginApi) -> None:
         self.api = api
+        self.has_debug_if = hasattr(api.logger, 'debug_if')
 
-    def _add_album_area_request(self, album_id: str, area_id: str):
+    def _debug_logger(self, text: str) -> None:
+        """Debug logging helper to use `debug_if()` if available.
+
+        Args:
+            text (str): Message to log.
+        """
+        if self.has_debug_if:
+            self.api.logger.debug_if(DebugOpt.PLUGIN_DEVELOPMENT, text)
+        else:
+            self.api.logger.debug(text)
+
+    def _add_album_area_request(self, album_id: str, area_id: str) -> None:
         if album_id not in self.album_area_requests:
             self.album_area_requests[album_id] = set()
         self.album_area_requests[album_id].add(area_id)
 
-    def _remove_album_area_request(self, album_id: str, area_id: str):
+    def _remove_album_area_request(self, album_id: str, area_id: str) -> None:
         if album_id in self.album_area_requests:
             self.album_area_requests[album_id].discard(area_id)
 
-    def _get_album_area_request_count(self, album_id: str):
+    def _get_album_area_request_count(self, album_id: str) -> int:
         if album_id not in self.album_area_requests:
             return 0
         return len(self.album_area_requests[album_id])
 
-    def _make_empty_target(self, album_id: str):
+    def _make_empty_target(self, album_id: str) -> None:
         """Create an empty album target node if it doesn't exist.
 
         Args:
@@ -156,7 +169,7 @@ class ArtistDetailsPlugin:
         if album_id not in self.albums:
             self.albums[album_id] = {ALBUM_ARTISTS: set(), TRACKS: []}
 
-    def _add_target(self, album_id: str, artists: set, target_metadata: Metadata):
+    def _add_target(self, album_id: str, artists: set, target_metadata: Metadata) -> None:
         """Add a metadata target to update for an album.
 
         Args:
@@ -167,131 +180,124 @@ class ArtistDetailsPlugin:
         self._make_empty_target(album_id)
         self.albums[album_id][TRACKS].append(MetadataPair(artists, target_metadata))
 
-    def _remove_album(self, album_id: str):
+    def _remove_album(self, album_id: str) -> None:
         """Removes an album from the metadata processing dictionary.
 
         Args:
             album_id (str): MBID of the album to remove.
         """
-        self.api.logger.debug("Removing album '%s'", album_id)
+        self._debug_logger(f"Removing album '{album_id}'")
         self.albums.pop(album_id, None)
         self.album_processing_count.pop(album_id, None)
 
-    def _album_add_request(self, album: Album):
+    def _album_add_request(self, album: Album) -> None:
         """Increment the number of pending requests for an album.
 
         Args:
-            album (api.Album): The Album object to use for the processing.
+            album (Album): The Album object to use for the processing.
         """
         if album.id not in self.album_processing_count:
             self.album_processing_count[album.id] = 0
         self.album_processing_count[album.id] += 1
 
-    def _album_remove_request(self, album: Album):
-        """Decrement the number of pending requests for an album.
+    def _album_remove_request(self, album: Album) -> None:
+        """Decrement the number of pending requests for an album.  Trigger
+        album finalization if there are no outstanding requests.
 
         Args:
             album (api.Album): The Album object to use for the processing.
         """
+        if album.id not in self.album_processing_count:
+            self.album_processing_count[album.id] = 1
+        self.album_processing_count[album.id] -= 1
 
+        if self.album_processing_count[album.id]:
+            return
 
-
+        self._debug_logger(f"Finalizing loading of album: {album}")
         self._save_artist_metadata(album)
-        print(f"\n\n\nFinalizing loading of album: {album}\n")
-        for _task in album.get_pending_tasks().values():
-            print(f"Pending: {_task.description}")
-        print("\n\n")
         album._finalize_loading(None)
 
-
-
-
-
-
-        # if album.id not in self.album_processing_count:
-        #     self.album_processing_count[album.id] = 1
-        # self.album_processing_count[album.id] -= 1
-        # if self._get_album_area_request_count(album.id) < 1:
-        #     self._save_artist_metadata(album.id)
-
-        #     # TODO: Find a way to avoid execution of `_finalize_loading` until triggered here to
-        #     # prevent scripts from using partially initialized variables and avoid warning about
-        #     # it already having been executed.
-
-
-
-        #     print(f"\n\n\nFinalizing loading of album: {album}\n")
-        #     for _task in album.get_pending_tasks().values():
-        #         print(f"Pending: {_task.description}")
-        #     print("\n\n")
-
-
-
-        #     album._finalize_loading(None)
-        #     # album._finalize_loading_album()
-
-    def remove_album(self, _api: PluginApi, album: Album):
+    def remove_album(self, _api: PluginApi, album: Album) -> None:
         """Remove the album from the albums processing dictionary.
 
         Args:
             _api (PluginApi): The plugin API object.
-            album (api.Album): The album object to remove.
+            album (Album): The album object to remove.
         """
         self._remove_album(album.id)
 
-    def make_album_vars(self, _api: PluginApi, album: Album, album_metadata, _release_metadata: dict):
+    def make_album_vars(self, _api: PluginApi, album: Album, album_metadata, _release_node: dict) -> None:
         """Process album artists.
 
         Args:
             _api (PluginApi): The plugin API object.
-            album (api.Album): The Album object to use for the processing.
+            album (Album): The Album object to use for the processing.
             album_metadata (Metadata): Metadata object for the album.
             _release_metadata (dict): Dictionary of release data from MusicBrainz api.
         """
+        self._debug_logger(f"Processing album: {album.id}")
         artists = set(artist.id for artist in album.get_album_artists())
         self._make_empty_target(album.id)
         self.albums[album.id][ALBUM_ARTISTS] = artists
+
         if not self.api.plugin_config[OPT_PROCESS_TRACKS]:
             self.api.logger.info("Track artist processing is disabled.")
+
         self._artist_processing(artists, album, album_metadata, 'Album')
 
-    def make_track_vars(self, _api: PluginApi, track: Track, album_metadata: Metadata,
-                        track_metadata: dict, _release_metadata: dict):
+    def _set_track_with_no_artists(self, track: Track, track_metadata: Metadata) -> None:
+        album = track.album
+        # self._save_artist_metadata(album)
+        for artist in self.albums[album.id][ALBUM_ARTISTS]:
+            self._set_artist_metadata(track_metadata, artist, self.result_cache[ARTIST][artist])
+        return
+
+    def make_track_vars(self, _api: PluginApi, track: Track, track_metadata: Metadata,
+                        track_node: dict, _release_node: dict) -> None:
         """Process track artists.
 
         Args:
             _api (PluginApi): The plugin API object.
-            album (api.Album): The Album object to use for the processing.
-            album_metadata (Metadata): Metadata object for the album.
-            track_metadata (dict): Dictionary of track data from MusicBrainz api.
-            _release_metadata (dict): Dictionary of release data from MusicBrainz api.
+            track (Track): The Track object to use for the processing.
+            track_metadata (Metadata): Metadata object for the album.
+            track_node (dict): Dictionary of track data from MusicBrainz api.
+            _release_node (dict): Dictionary of release data from MusicBrainz api.
         """
+        if not self.api.plugin_config[OPT_PROCESS_TRACKS]:
+            self._set_track_with_no_artists(track, track_metadata)
+            return
+
         artists = set()
         source_type = 'track'
         album = track.album
         # Test for valid metadata node.
         # The 'artist-credit' key should always be there.
         # This check is to avoid a runtime error if it doesn't exist for some reason.
-        if self.api.plugin_config[OPT_PROCESS_TRACKS]:
-            if 'artist-credit' in track_metadata:
-                for artist_credit in track_metadata['artist-credit']:
-                    if 'artist' in artist_credit:
-                        if 'id' in artist_credit['artist']:
-                            artists.add(artist_credit['artist']['id'])
-                    else:
-                        # No 'artist' specified.  Log as an error.
-                        self._metadata_error(album.id, 'artist-credit.artist', source_type)
-            else:
-                # No valid metadata found.  Log as error.
-                self._metadata_error(album.id, 'artist-credit', source_type)
-        self._artist_processing(artists, album, album_metadata, 'Track')
+        if 'artist-credit' in track_node:
+            for artist_credit in track_node['artist-credit']:
+                if 'artist' in artist_credit:
+                    if 'id' in artist_credit['artist']:
+                        artists.add(artist_credit['artist']['id'])
+                else:
+                    # No 'artist' specified.  Log as an error.
+                    self._metadata_error(album.id, 'artist-credit.artist', source_type)
+        else:
+            # No valid metadata found.  Log as error.
+            self._metadata_error(album.id, 'artist-credit', source_type)
 
-    def _artist_processing(self, artists: set, album: Album, destination_metadata: Metadata, source_type: str):
+        if not artists:
+            self._set_track_with_no_artists(track, track_metadata)
+            return
+
+        self._artist_processing(artists, album, track_metadata, 'Track')
+
+    def _artist_processing(self, artists: set, album: Album, destination_metadata: Metadata, source_type: str) -> None:
         """Retrieves the information for each artist not already processed.
 
         Args:
             artists (set): Set of artist MBIDs to process.
-            album (api.Album): Album object to use for the processing.
+            album (Album): Album object to use for the processing.
             destination_metadata (Metadata): Metadata object to update with the new variables.
             source_type (str): Source type (album or track) for logging messages.
         """
@@ -301,29 +307,28 @@ class ArtistDetailsPlugin:
                 self.api.logger.debug('Retrieving artist ID %s information from MusicBrainz.', temp_id)
                 self._get_artist_info(temp_id, album)
             else:
-                self.api.logger.debug('%s artist ID %s information available from cache.', source_type, temp_id)
+                self._debug_logger(f"{source_type} artist ID {temp_id} information available from cache.")
+
         self._add_target(album.id, artists, destination_metadata)
         self._save_artist_metadata(album)
 
-    def _save_artist_metadata(self, album: Album):
+    def _save_artist_metadata(self, album: Album) -> None:
         """Saves the new artist details variables to the metadata targets for the specified album.
 
         Args:
-            album_id (str): MBID of the album to process.
+            album (Album): The album to process.
         """
-        if album.get_pending_tasks():
-            return
         album_id = album.id
 
-        # if album_id in self.album_processing_count and self.album_processing_count[album_id]:
-        #     return
+        if album_id in self.album_processing_count and self.album_processing_count[album_id]:
+            return
 
-        # if self._get_album_area_request_count(album_id) > 0:
-        #     return
+        if self._get_album_area_request_count(album_id):
+            return
 
-        # if album_id not in self.albums or not self.albums[album_id][TRACKS]:
-        #     self.api.logger.error("No metadata targets found for album '%s'", album_id)
-        #     return
+        if album_id not in self.albums or not self.albums[album_id][TRACKS]:
+            self.api.logger.error("No metadata targets found for album '%s'", album_id)
+            return
 
         for item in self.albums[album_id][TRACKS]:
             # Add album artists to track so they are available in the metadata
@@ -333,7 +338,7 @@ class ArtistDetailsPlugin:
                 if artist in self.result_cache[ARTIST]:
                     self._set_artist_metadata(destination_metadata, artist, self.result_cache[ARTIST][artist])
 
-    def _set_artist_metadata(self, destination_metadata: Metadata, artist_id: str, artist_info: dict):
+    def _set_artist_metadata(self, destination_metadata: Metadata, artist_id: str, artist_info: dict) -> None:
         """Adds the artist information to the destination metadata.
 
         Args:
@@ -354,12 +359,12 @@ class ArtistDetailsPlugin:
             else:
                 _set_item(item, artist_info[item])
 
-    def _get_artist_info(self, artist_id: str, album: Album):
+    def _get_artist_info(self, artist_id: str, album: Album) -> None:
         """Gets the artist information from the MusicBrainz website.
 
         Args:
             artist_id (str): MBID of the artist to retrieve.
-            album (api.Album): The Album object to use for the processing.
+            album (Album): The Album object to use for the processing.
         """
         self._album_add_request(album)
         task_id = f"Artist={artist_id}"
@@ -380,7 +385,7 @@ class ArtistDetailsPlugin:
             blocking=True,
         )
 
-    def _artist_submission_handler(self, document, _reply, error, artist=None, album=None, task_id=None):
+    def _artist_submission_handler(self, document, _reply, error, artist=None, album=None, task_id=None) -> None:
         """Handles the response from the webservice requests for artist information.
         """
         try:
@@ -411,12 +416,12 @@ class ArtistDetailsPlugin:
             self.api.complete_album_task(album=album, task_id=task_id)
             self._album_remove_request(album)
 
-    def _get_area_info(self, area_id, album: Album):
+    def _get_area_info(self, area_id: str, album: Album) -> None:
         """Gets the area information from the MusicBrainz website.
 
         Args:
             area_id (str): MBID of the area to retrieve.
-            album (api.Album): The Album object to use for the processing.
+            album (Album): The Album object to use for the processing.
         """
         task_id = f"Area={area_id}"
         self.result_cache[AREA_REQUESTS].add(area_id)
@@ -440,7 +445,7 @@ class ArtistDetailsPlugin:
             blocking=True,
         )
 
-    def _area_submission_handler(self, document, _reply, error, area=None, album=None, task_id=None):
+    def _area_submission_handler(self, document, _reply, error, area=None, album=None, task_id=None) -> None:
         """Handles the response from the webservice requests for area information.
         """
         try:
@@ -463,7 +468,7 @@ class ArtistDetailsPlugin:
             self._remove_album_area_request(album.id, area)
             self._album_remove_request(album)
 
-    def _area_logger(self, area_id: str, area_name: str, area_type: str):
+    def _area_logger(self, area_id: str, area_name: str, area_type: str) -> None:
         """Adds a log entry for the area retrieved.
 
         Args:
@@ -471,16 +476,16 @@ class ArtistDetailsPlugin:
             area_name (str): Name of the area added.
             area_type (str): Type of area added.
         """
-        self.api.logger.debug("Adding area: %s => \"%s\" of type '%s'", area_id, area_name, area_type)
+        self._debug_logger(f"Adding area: {area_id} => \"{area_name}\" of type '{area_type}'")
 
     def _parse_area_relation(self, area_id: str, area_relation: dict, album: Album, area_name: str,
-                             area_type: str, area_type_text: str):
+                             area_type: str, area_type_text: str) -> None:
         """Parse an area relation to extract the area information.
 
         Args:
             area_id (str): MBID of the area providing the relationship.
             area_relation (dict): Dictionary of the area relationship.
-            album (api.Album): The Album object to use for the processing.
+            album (Album): The Album object to use for the processing.
             area_name (str): Name of the area providing the relationship.
             area_type (str): MBID of the type of area providing the relationship.
             area_type_text (str): Text description of the area providing the relationship.
@@ -547,7 +552,7 @@ class ArtistDetailsPlugin:
 
         return (area_id, area_name, country, area_type, area_type_text)
 
-    def _metadata_error(self, album_id: str, metadata_element: str, metadata_group: str):
+    def _metadata_error(self, album_id: str, metadata_element: str, metadata_group: str) -> None:
         """Logs metadata-related errors.
 
         Args:
@@ -597,13 +602,13 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
     TITLE = t_("ui.title", "Additional Artists Details")
     HELP_URL = USER_GUIDE_URL
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super(AdditionalArtistsDetailsOptionsPage, self).__init__(parent)
 
         self.ui = Ui_AdditionalArtistsDetailsOptionsPage()
         self.ui.setupUi(self)
 
-    def load(self):
+    def load(self) -> None:
         """Load the option settings.
         """
         self.ui.cb_process_tracks.setChecked(self.api.plugin_config[OPT_PROCESS_TRACKS])
@@ -611,7 +616,7 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         self.ui.cb_area_municipality.setChecked(self.api.plugin_config[OPT_AREA_MUNICIPALITY])
         self.ui.cb_area_subdivision.setChecked(self.api.plugin_config[OPT_AREA_SUBDIVISION])
 
-    def save(self):
+    def save(self) -> None:
         """Save the option settings.
         """
         self.api.plugin_config[OPT_PROCESS_TRACKS] = self.ui.cb_process_tracks.isChecked()
@@ -620,7 +625,7 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         self.api.plugin_config[OPT_AREA_SUBDIVISION] = self.ui.cb_area_subdivision.isChecked()
 
 
-def enable(api: PluginApi):
+def enable(api: PluginApi) -> None:
     """Called when plugin is enabled."""
     # Initialize settings
     api.plugin_config.register_option(OPT_PROCESS_TRACKS, False)
@@ -640,7 +645,7 @@ def enable(api: PluginApi):
     api.register_track_metadata_processor(plugin.make_track_vars, priority=100)
 
 
-def migrate_settings(api: PluginApi):
+def migrate_settings(api: PluginApi) -> None:
     if api.global_config.setting.raw_value('aad_process_tracks') is None:
         return
 
