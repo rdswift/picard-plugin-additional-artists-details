@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>561</width>
-    <height>381</height>
+    <height>511</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -23,7 +23,7 @@
    <item>
     <widget class="QScrollArea" name="scrollArea">
      <property name="frameShape">
-      <enum>QFrame::NoFrame</enum>
+      <enum>QFrame::Shape::NoFrame</enum>
      </property>
      <property name="widgetResizable">
       <bool>true</bool>
@@ -34,7 +34,7 @@
         <x>0</x>
         <y>0</y>
         <width>543</width>
-        <height>363</height>
+        <height>493</height>
        </rect>
       </property>
       <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -43,7 +43,6 @@
          <property name="font">
           <font>
            <pointsize>12</pointsize>
-           <weight>75</weight>
            <bold>true</bold>
           </font>
          </property>
@@ -64,7 +63,7 @@
           <string>page.description</string>
          </property>
          <property name="textFormat">
-          <enum>Qt::MarkdownText</enum>
+          <enum>Qt::TextFormat::MarkdownText</enum>
          </property>
          <property name="wordWrap">
           <bool>true</bool>
@@ -74,10 +73,10 @@
        <item>
         <spacer name="verticalSpacer_2">
          <property name="orientation">
-          <enum>Qt::Vertical</enum>
+          <enum>Qt::Orientation::Vertical</enum>
          </property>
          <property name="sizeType">
-          <enum>QSizePolicy::Fixed</enum>
+          <enum>QSizePolicy::Policy::Fixed</enum>
          </property>
          <property name="sizeHint" stdset="0">
           <size>
@@ -91,7 +90,6 @@
         <widget class="QLabel" name="process_section_title">
          <property name="font">
           <font>
-           <weight>75</weight>
            <bold>true</bold>
           </font>
          </property>
@@ -112,7 +110,7 @@
              <string>section.process.text</string>
             </property>
             <property name="textFormat">
-             <enum>Qt::MarkdownText</enum>
+             <enum>Qt::TextFormat::MarkdownText</enum>
             </property>
             <property name="wordWrap">
              <bool>true</bool>
@@ -132,10 +130,10 @@
        <item>
         <spacer name="verticalSpacer_3">
          <property name="orientation">
-          <enum>Qt::Vertical</enum>
+          <enum>Qt::Orientation::Vertical</enum>
          </property>
          <property name="sizeType">
-          <enum>QSizePolicy::Fixed</enum>
+          <enum>QSizePolicy::Policy::Fixed</enum>
          </property>
          <property name="sizeHint" stdset="0">
           <size>
@@ -149,7 +147,6 @@
         <widget class="QLabel" name="include_section_title">
          <property name="font">
           <font>
-           <weight>75</weight>
            <bold>true</bold>
           </font>
          </property>
@@ -167,7 +164,7 @@
              <string>section.include.text</string>
             </property>
             <property name="textFormat">
-             <enum>Qt::MarkdownText</enum>
+             <enum>Qt::TextFormat::MarkdownText</enum>
             </property>
             <property name="wordWrap">
              <bool>true</bool>
@@ -209,9 +206,180 @@
         </widget>
        </item>
        <item>
+        <spacer name="verticalSpacer_4">
+         <property name="orientation">
+          <enum>Qt::Orientation::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Policy::Fixed</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>6</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QLabel" name="cache_section_title">
+         <property name="font">
+          <font>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>section.cache.title</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QFrame" name="cache_section_frame">
+         <property name="frameShape">
+          <enum>QFrame::Shape::StyledPanel</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Shadow::Raised</enum>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_3">
+          <item>
+           <widget class="QLabel" name="cache_section_text">
+            <property name="text">
+             <string>section.cache.text</string>
+            </property>
+            <property name="textFormat">
+             <enum>Qt::TextFormat::MarkdownText</enum>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout">
+            <property name="topMargin">
+             <number>0</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="cache_file_label">
+              <property name="text">
+               <string>label.cache_file</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="cache_file">
+              <property name="text">
+               <string notr="true"/>
+              </property>
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QToolButton" name="b_open_cache_directory">
+              <property name="toolTip">
+               <string>tooltip.button.open_cache_dir</string>
+              </property>
+              <property name="text">
+               <string>...</string>
+              </property>
+              <property name="icon">
+               <iconset theme="folder"/>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_2">
+            <property name="topMargin">
+             <number>0</number>
+            </property>
+            <item>
+             <widget class="QCheckBox" name="cb_save_artists">
+              <property name="text">
+               <string>option.cache.save_artists</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="horizontalSpacer">
+              <property name="orientation">
+               <enum>Qt::Orientation::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QPushButton" name="b_edit_cache">
+              <property name="toolTip">
+               <string>tooltip.button.edit</string>
+              </property>
+              <property name="text">
+               <string>button.edit</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_3">
+            <property name="topMargin">
+             <number>0</number>
+            </property>
+            <item>
+             <widget class="QPushButton" name="b_load_cache">
+              <property name="toolTip">
+               <string>tooltip.button.load</string>
+              </property>
+              <property name="text">
+               <string>button.load</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="b_save_cache">
+              <property name="toolTip">
+               <string>tooltip.button.save</string>
+              </property>
+              <property name="text">
+               <string>button.save</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="b_import_cache">
+              <property name="toolTip">
+               <string>tooltip.button.import</string>
+              </property>
+              <property name="text">
+               <string>button.import</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="b_export_cache">
+              <property name="toolTip">
+               <string>tooltip.button.export</string>
+              </property>
+              <property name="text">
+               <string>button.export</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
         <spacer name="verticalSpacer">
          <property name="orientation">
-          <enum>Qt::Vertical</enum>
+          <enum>Qt::Orientation::Vertical</enum>
          </property>
          <property name="sizeHint" stdset="0">
           <size>
@@ -227,6 +395,21 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>scrollArea</tabstop>
+  <tabstop>cb_process_tracks</tabstop>
+  <tabstop>cb_area_county</tabstop>
+  <tabstop>cb_area_municipality</tabstop>
+  <tabstop>cb_area_subdivision</tabstop>
+  <tabstop>cache_file</tabstop>
+  <tabstop>b_open_cache_directory</tabstop>
+  <tabstop>cb_save_artists</tabstop>
+  <tabstop>b_edit_cache</tabstop>
+  <tabstop>b_load_cache</tabstop>
+  <tabstop>b_save_cache</tabstop>
+  <tabstop>b_import_cache</tabstop>
+  <tabstop>b_export_cache</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>
