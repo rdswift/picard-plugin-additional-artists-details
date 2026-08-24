@@ -25,7 +25,10 @@ import threading
 from typing import Callable
 
 from PyQt6 import QtWidgets
-from PyQt6.QtCore import QStandardPaths
+from PyQt6.QtCore import (
+    QStandardPaths,
+    Qt,
+)
 
 from picard.debug_opts import DebugOpt
 from picard.plugin3.api import (
@@ -36,13 +39,13 @@ from picard.plugin3.api import (
     Track,
     t_,
 )
+from picard.ui import PicardDialog
 from picard.ui.util import FileDialog
 from picard.util import open_local_path
 from picard.webservice.api_helpers import MBAPIHelper
 
-from .ui_options_additional_artists_details import (
-    Ui_AdditionalArtistsDetailsOptionsPage,
-)
+from .ui_artists_cache_editor import Ui_AdditionalArtistsDetailsCacheEditor
+from .ui_options_additional_artists_details import Ui_AdditionalArtistsDetailsOptionsPage
 
 
 USER_GUIDE_URL = 'https://picard-plugins-user-guides.readthedocs.io/en/latest/additional_artists_details/user_guide.html'
@@ -225,6 +228,18 @@ class DataCache:
         with lock:
             cls.cache['artist'][artist_id] = artist_info
             cls.is_dirty = True
+
+    @classmethod
+    def remove_artist_info(cls, artist_id: str) -> None:
+        """Remove the specified artist information from the cache.
+
+        Args:
+            artist_id (str): MBID of the artist.
+        """
+        with lock:
+            if artist_id in cls.cache['artist']:
+                del cls.cache['artist'][artist_id]
+                cls.is_dirty = True
 
     @classmethod
     def get_artist_info(cls, artist_id: str) -> dict:
@@ -910,6 +925,9 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         self.ui = Ui_AdditionalArtistsDetailsOptionsPage()
         self.ui.setupUi(self)
 
+        icon = self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_DirOpenIcon)
+        self.ui.b_open_cache_directory.setIcon(icon)
+
         self.ui.b_open_cache_directory.clicked.connect(self.open_cache_directory)
         self.ui.b_edit_cache.clicked.connect(self.cache_edit)
         self.ui.b_load_cache.clicked.connect(self.cache_load)
@@ -1062,15 +1080,217 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
     def cache_edit(self) -> None:
         """Edit the cache and file.
         """
-        QtWidgets.QMessageBox.critical(
-            self,
-            "Not Available",
-            "That functionality is still under development.",
-        )
+        editor = CacheEditorPage(self)
+        editor.exec()
 
     def open_cache_directory(self) -> None:
         cache_dir = DataCache.cache_dir
         open_local_path(cache_dir)
+
+
+class CacheEditorPage(PicardDialog):
+    """Cache Editor Dialog"""
+
+    _CONFIRMATION_MSG_TITLE = t_('ui.remove.confirmation.title', "Confirm Removal")
+    _CONFIRMATION_MSG_TEXT = t_(
+        key='ui.remove.confirmation.message',
+        text="You are about to remove {n} artist record from the cache.  Continue?",
+        plural="You are about to remove {n} artist records from the cache.  Continue?",
+    )
+    _SUCCESS_MSG_TITLE = t_('ui.remove.success.title', "Artist Removal Success")
+    _SUCCESS_MSG_TEXT = t_(
+        key='ui.remove.success.message',
+        text=(
+            "Artist removal from the cache successfully completed.\n\n"
+            "Please save or export the cache to save the changes."
+        ),
+    )
+    _FILTER_STATUS_UNFILTERED = t_('ui.filter_status.unfiltered', "(unfiltered)")
+    _FILTER_STATUS_FILTERED = t_(
+        key='ui.filter_status.filtered',
+        text="({n} item)",
+        plural="({n} items)",
+    )
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+
+        self.ui = Ui_AdditionalArtistsDetailsCacheEditor()
+        self.ui.setupUi(self)
+
+        self.matched_items = []
+
+        icon_up = self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_ArrowUp)
+        icon_dn = self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_ArrowDown)
+        self.ui.b_filter_previous.setIcon(icon_up)
+        self.ui.b_filter_next.setIcon(icon_dn)
+
+        self.api = PluginApi.get_api()
+
+        self.load_artists()
+        self.update_checked_selector_state()
+
+        self.ui.filter_text.setText("")
+        self._update_filter_status()
+
+        self.ui.cb_select_all.clicked.connect(self.selector_clicked)
+        self.ui.b_remove.clicked.connect(self.remove_artists)
+        self.ui.b_cancel.clicked.connect(self.close)
+
+        self.ui.listWidget.itemChanged.connect(self.list_item_changed)
+        self.ui.listWidget.currentRowChanged.connect(self._set_up_down_states)
+
+        self.ui.filter_text.textChanged.connect(self.filter_changed)
+        self.ui.b_filter_previous.clicked.connect(self.move_up)
+        self.ui.b_filter_next.clicked.connect(self.move_down)
+
+    def load_artists(self):
+        self.ui.listWidget.clear()
+        artists: dict = deepcopy(DataCache.cache['artist'])
+        for artist_id, artist in sorted(artists.items(), key=lambda x: x[1]['sort-name']):
+            item = QtWidgets.QListWidgetItem(f"{artist['sort-name']} [{artist['type']}]")
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Unchecked)
+            item.setData(Qt.ItemDataRole.UserRole, artist_id)
+            self.ui.listWidget.addItem(item)
+        self.current_item = self.ui.listWidget.item(0)
+        self.font_normal = self.current_item.font()
+        self.font_bold = self.current_item.font()
+        self.font_bold.setBold(True)
+
+    def _update_filter_status(self):
+        if self.ui.filter_text.text():
+            self.ui.filter_status_label.setText(self.api.trn(*self._FILTER_STATUS_FILTERED, n=len(self.matched_items)))
+        else:
+            self.ui.filter_status_label.setText(self.api.tr(self._FILTER_STATUS_UNFILTERED))
+
+    def filter_changed(self):
+        if self.ui.filter_text.text():
+            self.matched_items = self.ui.listWidget.findItems(self.ui.filter_text.text(), Qt.MatchFlag.MatchContains)
+        else:
+            self.matched_items = []
+        self._update_filter_status()
+
+        if self.matched_items:
+            self.ui.listWidget.setCurrentItem(self.matched_items[0])
+        else:
+            self.ui.listWidget.setCurrentRow(0)
+        self.current_item = self.ui.listWidget.currentItem()
+
+        for index in range(self.ui.listWidget.count()):
+            item = self.ui.listWidget.item(index)
+            if item in self.matched_items:
+                item.setFont(self.font_bold)
+            else:
+                item.setFont(self.font_normal)
+
+        self.ui.b_filter_previous.setEnabled(False)
+        self.ui.b_filter_next.setEnabled(len(self.matched_items) > 1)
+
+    def move_up(self):
+        current_index = self.ui.listWidget.currentRow()
+        new_item = self.ui.listWidget.item(0)
+        for item in reversed(self.matched_items):
+            try:
+                idx = self.ui.listWidget.row(item)
+                if idx < current_index:
+                    new_item = item
+                    break
+            except ValueError:
+                continue
+        self._move_current_item(new_item)
+
+    def move_down(self):
+        current_index = self.ui.listWidget.currentRow()
+        new_item = self.ui.listWidget.item(self.ui.listWidget.count() - 1)
+        for item in self.matched_items:
+            try:
+                idx = self.ui.listWidget.row(item)
+                if idx > current_index:
+                    new_item = item
+                    break
+            except ValueError:
+                continue
+        self._move_current_item(new_item)
+
+    def _move_current_item(self, item: QtWidgets.QListWidgetItem):
+        self.ui.listWidget.setCurrentItem(item)
+        self._set_up_down_states()
+
+    def _set_up_down_states(self):
+        if not self.matched_items:
+            self.ui.b_filter_previous.setEnabled(False)
+            self.ui.b_filter_next.setEnabled(False)
+        else:
+            # current_index = self.matched_items.index(self.current_item)
+            current_index = self.ui.listWidget.currentRow()
+            first_index = self.ui.listWidget.row(self.matched_items[0])
+            last_index = self.ui.listWidget.row(self.matched_items[-1])
+            self.ui.b_filter_previous.setEnabled(current_index > first_index)
+            self.ui.b_filter_next.setEnabled(current_index < last_index)
+
+    def list_item_changed(self, _item: QtWidgets.QListWidgetItem) -> None:
+        self.update_checked_selector_state()
+
+    def remove_artists(self) -> None:
+        count = self.get_checked_count()
+        if count < 1:
+            return
+
+        if QtWidgets.QMessageBox.warning(
+            self,
+            self.api.tr(self._CONFIRMATION_MSG_TITLE),
+            self.api.trn(*self._CONFIRMATION_MSG_TEXT, n=count),
+            QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel,
+            QtWidgets.QMessageBox.StandardButton.Cancel,
+        ) == QtWidgets.QMessageBox.StandardButton.Cancel:
+            return
+
+        for index in range(self.ui.listWidget.count()):
+            item = self.ui.listWidget.item(index)
+            if item.checkState() == Qt.CheckState.Checked:
+                DataCache.remove_artist_info(item.data(Qt.ItemDataRole.UserRole))
+
+        QtWidgets.QMessageBox.information(
+            self,
+            self.api.tr(self._SUCCESS_MSG_TITLE),
+            self.api.tr(self._SUCCESS_MSG_TEXT),
+        )
+
+        self.close()
+
+    def get_checked_count(self) -> int:
+        count = 0
+        for index in range(self.ui.listWidget.count()):
+            if self.ui.listWidget.item(index).checkState() == Qt.CheckState.Checked:
+                count += 1
+        return count
+
+    def selector_clicked(self):
+        total = self.ui.listWidget.count()
+        count = self.get_checked_count()
+        set_state = Qt.CheckState.Checked if count < total else Qt.CheckState.Unchecked
+        # for item in self.ui.listWidget.items():
+        #     item: QtWidgets.QListWidgetItem
+        for index in range(self.ui.listWidget.count()):
+            item = self.ui.listWidget.item(index)
+            item.setCheckState(set_state)
+        count = total if set_state == Qt.CheckState.Checked else 0
+        self.ui.checked_count_label.setText(f"({count:,}/{total:,})")
+        self.ui.cb_select_all.setCheckState(set_state)
+        self.ui.b_remove.setEnabled(count > 0)
+
+    def update_checked_selector_state(self) -> None:
+        total = self.ui.listWidget.count()
+        count = self.get_checked_count()
+        self.ui.checked_count_label.setText(f"({count:,}/{total:,})")
+        if count < 1:
+            self.ui.cb_select_all.setCheckState(Qt.CheckState.Unchecked)
+        elif count >= total:
+            self.ui.cb_select_all.setCheckState(Qt.CheckState.Unchecked)
+        else:
+            self.ui.cb_select_all.setCheckState(Qt.CheckState.PartiallyChecked)
+        self.ui.b_remove.setEnabled(count > 0)
 
 
 def enable(api: PluginApi) -> None:

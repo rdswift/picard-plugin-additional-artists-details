@@ -1,20 +1,33 @@
 "manifest.description" = "Ce plugin fournit des variables spécifiques aux albums et aux morceaux, ainsi que des informations sur les artistes, destinées à être utilisées dans les scripts de balisage et de nommage."
 "manifest.long_description" = "Ce plugin fournit des variables spécialisées pour les albums et les pistes, ainsi que des informations sur les artistes, destinées à être utilisées dans les scripts de balisage et de nommage. Notez que cela génère\ndes appels supplémentaires à l'API MusicBrainz pour obtenir les informations sur les artistes et la région, ce qui ralentit le traitement. Ce ralentissement sera particulièrement\nperceptible lorsqu'il y a de nombreux artistes différents pour les albums ou les pistes, comme c'est le cas sur un album [Various Artists]. Une option permet de désactiver le traitement des\nartistes de pistes, ce qui peut augmenter considérablement la vitesse de traitement si vous ne vous intéressez qu'aux informations sur l'artiste de l'album.\n"
 "manifest.name" = "Informations supplémentaires sur les artistes"
-"qt.AdditionalArtistsDetailsOptionsPage.button.edit" = "Modifier le cache"
+"qt.AdditionalArtistsDetailsCacheEditor.artists_list.title" = "Artistes dans le Cache"
+"qt.AdditionalArtistsDetailsCacheEditor.button.cancel" = "Annuler"
+"qt.AdditionalArtistsDetailsCacheEditor.button.remove" = "Supprimer"
+"qt.AdditionalArtistsDetailsCacheEditor.label.filter" = "Filtre :"
+"qt.AdditionalArtistsDetailsCacheEditor.page.description" = "Cet éditeur vous permet de supprimer un ou plusieurs artistes du cache actuel afin qu'ils soient mis à jour avec les nouvelles données la prochaine fois qu'ils apparaîtront sur un album chargé depuis MusicBrainz. Notez que cela entraînera des appels supplémentaires à l'API et pourra ralentir le chargement de l'album.\n\nÉtant donné que les informations relatives à la région entraînent de nombreux appels supplémentaires à l'API, ce qui se traduit par des retards importants, et que ces informations changent rarement, les éléments relatifs à la région ne peuvent pas être supprimés du cache à l'aide de cet éditeur."
+"qt.AdditionalArtistsDetailsCacheEditor.page.title" = "Éditeur de cache des informations supplémentaires sur les artistes"
+"qt.AdditionalArtistsDetailsCacheEditor.placeholder.filter_text" = "filtrer le texte"
+"qt.AdditionalArtistsDetailsCacheEditor.tooltip.button.cancel" = "Annuler la modification et revenir à l'écran des options."
+"qt.AdditionalArtistsDetailsCacheEditor.tooltip.button.remove" = "Supprimer les artistes sélectionnés du cache."
+"qt.AdditionalArtistsDetailsCacheEditor.tooltip.filter_next" = "Passer à l'élément correspondant suivant."
+"qt.AdditionalArtistsDetailsCacheEditor.tooltip.filter_previous" = "Passer à l'élément correspondant précédent."
+"qt.AdditionalArtistsDetailsCacheEditor.tooltip.filter_text" = "Saisissez le texte qui vous permettra de trouver rapidement les entrées correspondantes dans la liste des artistes."
+"qt.AdditionalArtistsDetailsCacheEditor.window.title" = "Éditeur de cache"
+"qt.AdditionalArtistsDetailsOptionsPage.button.edit" = "Modifier"
 "qt.AdditionalArtistsDetailsOptionsPage.button.export" = "Exporter"
 "qt.AdditionalArtistsDetailsOptionsPage.button.import" = "Importer"
 "qt.AdditionalArtistsDetailsOptionsPage.button.load" = "Charger"
 "qt.AdditionalArtistsDetailsOptionsPage.button.save" = "Enregistrer"
 "qt.AdditionalArtistsDetailsOptionsPage.label.cache_file" = "Fichier :"
-"qt.AdditionalArtistsDetailsOptionsPage.option.cache.save_artists" = "Inclure les artistes lors de l'enregistrement dans le cache"
+"qt.AdditionalArtistsDetailsOptionsPage.option.cache.save_artists" = "Inclure les artistes lors de l'enregistrement dans le fichier de cache"
 "qt.AdditionalArtistsDetailsOptionsPage.option.include.county" = "Indiquer le comté"
 "qt.AdditionalArtistsDetailsOptionsPage.option.include.municipality" = "Indiquer la commune"
 "qt.AdditionalArtistsDetailsOptionsPage.option.include.subdivision" = "Inclure la subdivision géographique"
 "qt.AdditionalArtistsDetailsOptionsPage.option.process.tracks" = "Exécuter artistes de la piste"
 "qt.AdditionalArtistsDetailsOptionsPage.page.description" = "Ces paramètres déterminent le fonctionnement du plugin **Informations supplémentaires sur les artistes**."
 "qt.AdditionalArtistsDetailsOptionsPage.page.title" = "Informations supplémentaires sur les artistes"
-"qt.AdditionalArtistsDetailsOptionsPage.section.cache.text" = "Les informations relatives à l'artiste et (éventuellement) au genre musical sont enregistrées dans un fichier de cache persistant afin d'être conservées d'une session Picard à l'autre. Cela permet de réduire considérablement le temps nécessaire au chargement d'un album en éliminant les appels API superflus pour des informations déjà récupérées."
+"qt.AdditionalArtistsDetailsOptionsPage.section.cache.text" = "Les informations relatives à la région et (éventuellement) à l'artiste sont enregistrées dans un fichier de cache persistant afin d'être conservées d'une session Picard à l'autre. Cela permet de réduire considérablement le temps nécessaire au chargement d'un album en éliminant les appels API superflus pour des informations déjà récupérées. Les informations relatives à la région génèrent généralement le plus grand nombre d'appels API supplémentaires et constituent donc le principal facteur de retard lors du chargement d'un album. C'est pourquoi ces informations sont toujours enregistrées dans le fichier de cache persistant."
 "qt.AdditionalArtistsDetailsOptionsPage.section.cache.title" = "Cache persistant"
 "qt.AdditionalArtistsDetailsOptionsPage.section.include.text" = "Cette option permet de déterminer si les informations relatives au comté, à la commune et à la subdivision doivent être incluses dans les variables de localisation de l'artiste créées. Quels que soient ces paramètres, ces informations seront incluses si un comté, une commune ou une subdivision est la zone spécifiée pour un artiste."
 "qt.AdditionalArtistsDetailsOptionsPage.section.include.title" = "Ajouter les détails du quartier"
@@ -34,8 +47,27 @@
 "ui.error.cache_title" = "Erreur de cache"
 "ui.filter.all" = "Tous les fichiers"
 "ui.filter.json" = "Fichiers JSON"
+"ui.remove.confirmation.title" = "Confirmer la suppression"
+"ui.remove.success.message" = "La suppression de l'artiste du cache s'est déroulée avec succès.\n\nVeuillez enregistrer ou exporter le cache pour conserver les modifications."
+"ui.remove.success.title" = "Suppression de l'artiste réussie"
 "ui.success.export" = "Le fichier de cache a été exporté avec succès.\nFichier : %s"
 "ui.success.import" = "Le fichier de cache a été importé avec succès.\nFichier : %s"
 "ui.success.load" = "Le fichier de cache a été rechargé avec succès."
 "ui.success.save" = "Le fichier de cache a été mis à jour avec succès."
 "ui.title" = "Informations supplémentaires sur les artistes"
+
+"ui.filter_status.unfiltered" = "(non filtré)"
+
+["ui.filter_status.filtered"]
+one = "({n} élément)"
+other = "({n} éléments)"
+
+
+
+["ui.remove.confirmation.message"]
+one = "Vous êtes sur le point de supprimer {n} fiches d'artistes du cache. Voulez-vous continuer ?"
+other = "Vous êtes sur le point de supprimer {n} fiches d'artistes du cache. Voulez-vous continuer ?"
+
+
+
+
