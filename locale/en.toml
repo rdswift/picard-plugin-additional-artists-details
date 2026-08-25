@@ -25,11 +25,12 @@
 "qt.AdditionalArtistsDetailsOptionsPage.option.include.municipality" = "Include location municipality"
 "qt.AdditionalArtistsDetailsOptionsPage.option.include.subdivision" = "Include location subdivision"
 "qt.AdditionalArtistsDetailsOptionsPage.option.process.tracks" = "Process track artists"
+"qt.AdditionalArtistsDetailsOptionsPage.option.use_cache" = "Use the persistent cache system"
 "qt.AdditionalArtistsDetailsOptionsPage.page.description" = "These settings will determine how the **Additional Artists Details** plugin operates."
 "qt.AdditionalArtistsDetailsOptionsPage.page.title" = "Additional Artists Details"
 "qt.AdditionalArtistsDetailsOptionsPage.section.cache.text" = "Area and (optionally) artist information is saved to a persistent cache file so that it is retained between Picard sessions. This can significantly reduce the time required to load an album by eliminating unnecessary API calls for information already retrieved. Area information usually provides the most additional API calls, and thus is the largest contributor to delays when loading an album. For this reason, area information is always saved to the persistent cache file."
 "qt.AdditionalArtistsDetailsOptionsPage.section.cache.title" = "Persistent Cache"
-"qt.AdditionalArtistsDetailsOptionsPage.section.include.text" = "This option determines whether or not County, Municipality and Subdivision information is included in the artist location variables created. Regardless of these settings, this information will be included if a County, Municipality or Subdivision is the area specified for an artist."
+"qt.AdditionalArtistsDetailsOptionsPage.section.include.text" = "These options determine whether or not County, Municipality and Subdivision information is included in the artist location variables created. Regardless of these settings, this information will be included if a County, Municipality or Subdivision is the area specified for an artist."
 "qt.AdditionalArtistsDetailsOptionsPage.section.include.title" = "Include Area Details"
 "qt.AdditionalArtistsDetailsOptionsPage.section.process.text" = "This option determines whether or not details are retrieved for all track artists on the release. If you are only interested in details for the album artists then this should be disabled, thus significantly reducing the number of additional calls made to the MusicBrainz API and reducing the time required to load a release.  Album artists are always processed."
 "qt.AdditionalArtistsDetailsOptionsPage.section.process.title" = "Process Track Artists"
@@ -47,6 +48,7 @@
 "ui.error.cache_title" = "Cache Error"
 "ui.filter.all" = "All files"
 "ui.filter.json" = "JSON files"
+"ui.filter_status.unfiltered" = "(unfiltered)"
 "ui.remove.confirmation.title" = "Confirm Removal"
 "ui.remove.success.message" = "Artist removal from the cache successfully completed.\n\nPlease save or export the cache to save the changes."
 "ui.remove.success.title" = "Artist Removal Success"
@@ -56,12 +58,9 @@
 "ui.success.save" = "Successfully updated the cache file."
 "ui.title" = "Additional Artists Details"
 
-"ui.filter_status.unfiltered" = "(unfiltered)"
-
 ["ui.filter_status.filtered"]
 one = "({n} item)"
 other = "({n} items)"
-
 
 ["ui.remove.confirmation.message"]
 one = "You are about to remove {n} artist record from the cache.  Continue?"

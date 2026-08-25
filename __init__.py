@@ -80,6 +80,7 @@ OPT_AREA_MUNICIPALITY = 'area_municipality'
 OPT_AREA_SUBDIVISION = 'area_subdivision'
 OPT_PROCESS_TRACKS = 'process_tracks'
 OPT_SAVE_ARTISTS_IN_CACHE = 'save_artists_cache'
+OPT_USE_CACHE = 'use_cache'
 
 lock = threading.Lock()
 
@@ -196,6 +197,7 @@ class DataCache:
     cache_dir = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppDataLocation)
     cache_file = os.path.join(cache_dir, 'aad_cache.json')
     save_artists = True
+    use_persistent_cache = True
 
     @classmethod
     def get_artist_cache(cls) -> dict:
@@ -321,6 +323,9 @@ class DataCache:
     def save_cache(cls, save_artists: bool | None = None) -> None:
         """Save the cache to the persistent cache file.
         """
+        if not cls.use_persistent_cache:
+            return
+
         error_prefix = "Error saving cache:"
         if not cls.is_dirty:
             raise CacheException("Cache has not changed.  Save canceled.")
@@ -358,6 +363,9 @@ class DataCache:
         Args:
             filename (str): Path and name of the cache file to export.
         """
+        if not cls.use_persistent_cache:
+            return
+
         cls._save_cache(filename=filename, save_artists=save_artists)
 
 
@@ -935,6 +943,8 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         self.ui.b_import_cache.clicked.connect(self.cache_import)
         self.ui.b_export_cache.clicked.connect(self.cache_export)
 
+        self.ui.cb_use_cache.stateChanged.connect(self._use_cache_state_changed)
+
         self.save_artists_changed = False
         self.ui.cb_save_artists.stateChanged.connect(self._save_artists_state_changed)
 
@@ -954,9 +964,11 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         self.ui.cb_area_county.setChecked(self.api.plugin_config[OPT_AREA_COUNTY])
         self.ui.cb_area_municipality.setChecked(self.api.plugin_config[OPT_AREA_MUNICIPALITY])
         self.ui.cb_area_subdivision.setChecked(self.api.plugin_config[OPT_AREA_SUBDIVISION])
+        self.ui.cb_use_cache.setChecked(self.api.plugin_config[OPT_USE_CACHE])
         self.save_artists = self.api.plugin_config[OPT_SAVE_ARTISTS_IN_CACHE]
         self.ui.cb_save_artists.setChecked(self.save_artists)
         self._set_edit_button_state()
+        self._use_cache_state_changed()
 
     def save(self) -> None:
         """Save the option settings.
@@ -965,6 +977,7 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         self.api.plugin_config[OPT_AREA_COUNTY] = self.ui.cb_area_county.isChecked()
         self.api.plugin_config[OPT_AREA_MUNICIPALITY] = self.ui.cb_area_municipality.isChecked()
         self.api.plugin_config[OPT_AREA_SUBDIVISION] = self.ui.cb_area_subdivision.isChecked()
+        self.api.plugin_config[OPT_USE_CACHE] = self.ui.cb_use_cache.isChecked()
         DataCache.save_artists = self.ui.cb_save_artists.isChecked()
         self.api.plugin_config[OPT_SAVE_ARTISTS_IN_CACHE] = DataCache.save_artists
         if DataCache.save_artists != self.save_artists:
@@ -975,12 +988,20 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         self.save_artists_changed = True
         self._set_edit_button_state()
 
+    def _use_cache_state_changed(self) -> None:
+        enabled = self.ui.cb_use_cache.isChecked()
+        self.ui.b_load_cache.setEnabled(enabled)
+        self.ui.b_save_cache.setEnabled(enabled)
+
     def _set_edit_button_state(self) -> None:
         self.ui.b_edit_cache.setEnabled(self.ui.cb_save_artists.isChecked())
 
     def cache_load(self) -> None:
         """Load the cache file.
         """
+        saved_state = DataCache.use_persistent_cache
+        DataCache.use_persistent_cache = True
+
         try:
             DataCache.load_cache()
             QtWidgets.QMessageBox.information(
@@ -996,9 +1017,14 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
                 self.api.tr(self._ERR_MSG_CACHE_LOAD) % (ex,),
             )
 
+        DataCache.use_persistent_cache = saved_state
+
     def cache_save(self) -> None:
         """Save the cache file.
         """
+        saved_state = DataCache.use_persistent_cache
+        DataCache.use_persistent_cache = True
+
         if self.save_artists_changed:
             DataCache.is_dirty = True
             self.save_artists_changed = False
@@ -1021,6 +1047,8 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
                 self.api.tr(self._ERR_MSG_TITLE),
                 self.api.tr(self._ERR_MSG_CACHE_SAVE) % (ex,),
             )
+
+        DataCache.use_persistent_cache = saved_state
 
     def cache_import(self) -> None:
         """Import from a cache file.
@@ -1300,6 +1328,7 @@ def enable(api: PluginApi) -> None:
     api.plugin_config.register_option(OPT_AREA_COUNTY, True)
     api.plugin_config.register_option(OPT_AREA_MUNICIPALITY, True)
     api.plugin_config.register_option(OPT_AREA_SUBDIVISION, True)
+    api.plugin_config.register_option(OPT_USE_CACHE, True)
     api.plugin_config.register_option(OPT_SAVE_ARTISTS_IN_CACHE, True)
 
     # Migrate settings from 2.x version if available
@@ -1313,13 +1342,17 @@ def enable(api: PluginApi) -> None:
     api.register_album_metadata_processor(plugin.make_album_vars, priority=100)
     api.register_track_metadata_processor(plugin.make_track_vars, priority=100)
 
+    DataCache.use_persistent_cache = api.plugin_config[OPT_USE_CACHE]
     DataCache.save_artists = api.plugin_config[OPT_SAVE_ARTISTS_IN_CACHE]
 
     # Populate cache from file
-    try:
-        DataCache.load_cache()
-    except CacheException as ex:
-        api.logger.error(str(ex))
+    if DataCache.use_persistent_cache:
+        try:
+            DataCache.load_cache()
+        except CacheException as ex:
+            api.logger.error(str(ex))
+    else:
+        api.logger.info("Persistent cache is diabled.")
 
 
 def disable():

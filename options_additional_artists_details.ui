@@ -241,6 +241,13 @@
        </widget>
       </item>
       <item>
+       <widget class="QCheckBox" name="cb_use_cache">
+        <property name="text">
+         <string>option.use_cache</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <layout class="QHBoxLayout" name="horizontalLayout">
         <property name="topMargin">
          <number>0</number>
@@ -357,13 +364,17 @@
   </layout>
  </widget>
  <tabstops>
+  <tabstop>cb_process_tracks</tabstop>
   <tabstop>cb_area_county</tabstop>
   <tabstop>cb_area_municipality</tabstop>
   <tabstop>cb_area_subdivision</tabstop>
+  <tabstop>cb_use_cache</tabstop>
   <tabstop>cache_file</tabstop>
   <tabstop>b_open_cache_directory</tabstop>
+  <tabstop>cb_save_artists</tabstop>
   <tabstop>b_load_cache</tabstop>
   <tabstop>b_save_cache</tabstop>
+  <tabstop>b_edit_cache</tabstop>
   <tabstop>b_import_cache</tabstop>
   <tabstop>b_export_cache</tabstop>
  </tabstops>
