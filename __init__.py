@@ -16,8 +16,8 @@
 # with this program; if not, see <https://www.gnu.org/licenses/>.
 
 
-from collections import namedtuple
 from copy import deepcopy
+from dataclasses import dataclass
 from functools import partial
 import json
 import os
@@ -49,9 +49,6 @@ from .ui_options_additional_artists_details import Ui_AdditionalArtistsDetailsOp
 
 
 USER_GUIDE_URL = 'https://picard-plugins-user-guides.readthedocs.io/en/latest/additional_artists_details/user_guide.html'
-
-# Named tuple for code clarity
-MetadataPair = namedtuple('MetadataPair', ['artists', 'target'])
 
 # MusicBrainz ID codes for relationship types
 RELATIONSHIP_TYPE_PART_OF = 'de7cc874-8b1b-3a05-8272-f3834c968fb7'
@@ -89,12 +86,12 @@ class CustomHelper(MBAPIHelper):
     """Custom MusicBrainz API helper to retrieve artist and area information.
     """
 
-    def get_artist_by_id(self, _id: str, handler: Callable, inc: list = None, priority: bool = False, important:bool = False,
+    def get_artist_by_id(self, mbid: str, handler: Callable, inc: list = None, priority: bool = False, important:bool = False,
                          mblogin: bool = False, refresh: bool = False):
         """Get information for the specified artist MBID.
 
         Args:
-            _id (str): Artist MBID to retrieve.
+            mbid (str): Artist MBID to retrieve.
             handler (Callable): Callback used to process the returned information.
             inc (list, optional): List of includes to add to the API call. Defaults to None.
             priority (bool, optional): Process the request at a high priority. Defaults to False.
@@ -105,14 +102,14 @@ class CustomHelper(MBAPIHelper):
         Returns:
             PendingRequest: Requested task object.
         """
-        return self._get_by_id(ARTIST, _id, handler, inc, priority=priority, important=important, mblogin=mblogin, refresh=refresh)
+        return self._get_by_id(ARTIST, mbid, handler, inc, priority=priority, important=important, mblogin=mblogin, refresh=refresh)
 
-    def get_area_by_id(self, _id: str, handler: Callable, inc: list = None, priority: bool = False, important: bool = False,
+    def get_area_by_id(self, mbid: str, handler: Callable, inc: list = None, priority: bool = False, important: bool = False,
                        mblogin: bool = False, refresh: bool = False):
         """Get information for the specified area MBID.
 
         Args:
-            _id (str): Area MBID to retrieve.
+            mbid (str): Area MBID to retrieve.
             handler (Callable): Callback used to process the returned information.
             inc (list, optional): List of includes to add to the API call. Defaults to None.
             priority (bool, optional): Process the request at a high priority. Defaults to False.
@@ -126,7 +123,16 @@ class CustomHelper(MBAPIHelper):
         if inc is None:
             inc = ['area-rels']
 
-        return self._get_by_id(AREA, _id, handler, inc, priority=priority, important=important, mblogin=mblogin, refresh=refresh)
+        return self._get_by_id(AREA, mbid, handler, inc, priority=priority, important=important, mblogin=mblogin, refresh=refresh)
+
+
+@dataclass
+class MetadataPair:
+    """Track metadata pair"""
+    artists: set
+    """Artists on the track"""
+    target: Metadata
+    """Track metadata object to update"""
 
 
 class Area:
@@ -188,16 +194,16 @@ class CacheException(Exception):
 
 class DataCache:
     FILE_PROCESSING_EXCEPTION_MESSAGE = "Cache file processing already in progress."
-    cache: dict = {
+    cache: dict[str, dict] = {
         'artist': {},
         'area': {},
     }
     is_dirty: bool = False
-    _file_processing = False
-    cache_dir = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppDataLocation)
-    cache_file = os.path.join(cache_dir, 'aad_cache.json')
-    save_artists = True
-    use_persistent_cache = True
+    _file_processing: bool = False
+    cache_dir: str = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppDataLocation)
+    cache_file: str = os.path.join(cache_dir, 'aad_cache.json')
+    save_artists: bool = True
+    use_persistent_cache: bool = True
 
     @classmethod
     def get_artist_cache(cls) -> dict:
@@ -244,7 +250,7 @@ class DataCache:
                 cls.is_dirty = True
 
     @classmethod
-    def get_artist_info(cls, artist_id: str) -> dict:
+    def get_artist_info(cls, artist_id: str) -> dict[str, dict]:
         """Get the dictionary of information for an artist.
 
         Args:
@@ -285,19 +291,25 @@ class DataCache:
 
     @classmethod
     def _load_cache(cls, filename: str | None = None) -> None:
+        """Add missing cache items from file.
+        """
         with open(filename or cls.cache_file, 'r', encoding='utf8') as f:
             info_dict = json.load(fp=f)
 
-        for key, value in info_dict['artist'].items():
-            if key not in cls.cache['artist']:
-                cls.set_artist_info(key, value)
+        if 'artist' in info_dict:
+            for key, value in info_dict['artist'].items():
+                if key not in cls.cache['artist']:
+                    cls.set_artist_info(key, value)
 
-        for key, value in info_dict['area'].items():
-            if key not in cls.cache['area']:
-                cls.set_area_info(key, value)
+        if 'area' in info_dict:
+            for key, value in info_dict['area'].items():
+                if key not in cls.cache['area']:
+                    cls.set_area_info(key, value)
 
     @classmethod
     def _save_cache(cls, filename: str | None = None, save_artists: bool = True) -> None:
+        """Save cache items to file.
+        """
         cache = deepcopy(cls.cache)
         if not save_artists:
             cache['artist'] = {}
@@ -376,12 +388,12 @@ class ArtistDetailsPlugin:
     # Area types to exclude from the location string
     EXCLUDE_AREA_TYPES = {AREA_TYPE_MUNICIPALITY, AREA_TYPE_COUNTY, AREA_TYPE_SUBDIVISION}
 
-    cache_requests = {
+    cache_requests: dict[str, set] = {
         'artist': set(),
         'area': set(),
     }
-    album_processing_count = {}
-    albums = {}
+    album_processing_count: dict[str, int] = {}
+    albums: dict = {}
     album_area_requests: dict[str, set] = {}
 
     def __init__(self, api: PluginApi) -> None:
@@ -400,15 +412,35 @@ class ArtistDetailsPlugin:
             self.api.logger.debug(text)
 
     def _add_album_area_request(self, album_id: str, area_id: str) -> None:
+        """Add an album area request.
+
+        Args:
+            album_id (str): MBID of the album
+            area_id (str): MBID of the area
+        """
         if album_id not in self.album_area_requests:
             self.album_area_requests[album_id] = set()
         self.album_area_requests[album_id].add(area_id)
 
     def _remove_album_area_request(self, album_id: str, area_id: str) -> None:
+        """Remove an album area request.
+
+        Args:
+            album_id (str): MBID of the album
+            area_id (str): MBID of the area
+        """
         if album_id in self.album_area_requests:
             self.album_area_requests[album_id].discard(area_id)
 
     def _get_album_area_request_count(self, album_id: str) -> int:
+        """Get the count of the current album area requests.
+
+        Args:
+            album_id (str): MBID of the album
+
+        Returns:
+            int: Number of current requests
+        """
         if album_id not in self.album_area_requests:
             return 0
         return len(self.album_area_requests[album_id])
@@ -471,7 +503,7 @@ class ArtistDetailsPlugin:
         if self._save_artist_metadata(album):
             album._finalize_loading(None)
 
-        # Save the cache to a file
+        # Save the cache to the persistent cache file
         try:
             DataCache.save_cache()
         except CacheException as ex:
@@ -506,10 +538,14 @@ class ArtistDetailsPlugin:
         self._artist_processing(artists, album, album_metadata, 'Album')
 
     def _set_track_with_no_artists(self, track: Track, track_metadata: Metadata) -> None:
+        """Set the track metadata using the album artist if no artists identified for the track.
+
+        Args:
+            track (Track): Track object to process
+            track_metadata (Metadata): Metadata object to update.
+        """
         album = track.album
-        # self._save_artist_metadata(album)
         for artist in self.albums[album.id][ALBUM_ARTISTS]:
-            # self._set_artist_metadata(track_metadata, artist, self.result_cache[ARTIST][artist])
             self._set_artist_metadata(track_metadata, artist)
         return
 
@@ -559,12 +595,10 @@ class ArtistDetailsPlugin:
             artists (set): Set of artist MBIDs to process.
             album (Album): Album object to use for the processing.
             destination_metadata (Metadata): Metadata object to update with the new variables.
-            source_type (str): Source type (album or track) for logging messages.
+            source_type (str): Source type ('album' or 'track') for logging messages.
         """
         for temp_id in artists:
-            # if temp_id not in self.result_cache[ARTIST_REQUESTS]:
             if temp_id not in self.cache_requests['artist'] and temp_id not in DataCache.cache['artist']:
-                # self.result_cache[ARTIST_REQUESTS].add(temp_id)
                 self.cache_requests['artist'].add(temp_id)
                 self.api.logger.debug('Retrieving artist ID %s information from MusicBrainz.', temp_id)
                 self._get_artist_info(temp_id, album)
@@ -593,28 +627,26 @@ class ArtistDetailsPlugin:
             return False
 
         for item in self.albums[album_id][TRACKS]:
+            item: MetadataPair
             # Add album artists to track so they are available in the metadata
             artists = self.albums[album_id][ALBUM_ARTISTS].copy().union(item.artists)
             destination_metadata = item.target
             for artist in artists:
-                # if artist in self.result_cache[ARTIST]:
                 if artist in self.cache_requests['artist'] or artist in DataCache.cache['artist']:
-                    # self._set_artist_metadata(destination_metadata, artist, self.result_cache[ARTIST][artist])
                     self._set_artist_metadata(destination_metadata, artist)
 
         return True
 
-    # def _set_artist_metadata(self, destination_metadata: Metadata, artist_id: str, artist_info: dict) -> None:
     def _set_artist_metadata(self, destination_metadata: Metadata, artist_id: str) -> None:
         """Adds the artist information to the destination metadata.
 
         Args:
             destination_metadata (Metadata): Metadata object to update with new variables.
             artist_id (str): MBID of the artist to update.
-            artist_info (dict): Dictionary of information for the artist.
         """
-        def _set_item(key, value):
-            destination_metadata[f"~artist_{artist_id}_{key.replace('-', '_')}"] = value
+        def _set_item(key: str, value: str):
+            key_ = f"~artist_{artist_id}_{key.replace('-', '_')}"
+            destination_metadata[key_] = value
 
         artist_info = DataCache.get_artist_info(artist_id)
 
@@ -676,7 +708,6 @@ class ArtistDetailsPlugin:
                 if item in document and document[item] and 'id' in document[item] and document[item]['id']:
                     area_id = document[item]['id']
                     artist_info[item] = area_id
-                    # if area_id not in self.result_cache[AREA_REQUESTS]:
                     if area_id not in self.cache_requests['area'] and area_id not in DataCache.cache['area']:
                         self._get_area_info(area_id, album)
 
@@ -781,13 +812,11 @@ class ArtistDetailsPlugin:
         if not area_info.parent:
             return
 
-        def _add_country(_id, name, country, _type, type_text):
-            # if _id not in self.result_cache[AREA]:
-            if _id not in DataCache.get_area_cache():
-                self._area_logger(_id, f"{name} ({country})", type_text)
-                # self.result_cache[AREA][_id] = Area('', name, country, _type, type_text)
-                DataCache.set_area_info(_id, Area('', name, country, _type, type_text))
-                self.cache_requests['area'].add(_id)
+        def _add_country(mbid, name, country, area_type, type_text):
+            if mbid not in DataCache.get_area_cache():
+                self._area_logger(mbid, f"{name} ({country})", type_text)
+                DataCache.set_area_info(mbid, Area('', name, country, area_type, type_text))
+                self.cache_requests['area'].add(mbid)
 
         if 'direction' in area_relation and area_relation['direction'] == 'backward':
             if area_id not in self.cache_requests['area']:
@@ -806,10 +835,10 @@ class ArtistDetailsPlugin:
 
             if area_info.area_type == AREA_TYPE_COUNTRY:
                 _add_country(
-                    _id=area_info.parent,
+                    mbid=area_info.parent,
                     name=area_info.name,
                     country=area_info.country,
-                    _type=area_info.area_type,
+                    area_type=area_info.area_type,
                     type_text=area_info.type_text,
                 )
 
@@ -819,10 +848,10 @@ class ArtistDetailsPlugin:
 
         elif 'direction' in area_relation and area_relation['direction'] == 'forward' and area_info.area_type == AREA_TYPE_COUNTRY:
             _add_country(
-                _id=area_info.parent,
+                mbid=area_info.parent,
                 name=area_info.name,
                 country=area_info.country,
-                _type=area_info.area_type,
+                area_type=area_info.area_type,
                 type_text=area_info.type_text,
             )
 
@@ -833,10 +862,10 @@ class ArtistDetailsPlugin:
                 area_type=area_info.type_text,
             )
             self.cache_requests['area'].add(area_info.parent)
-            _id = area_info.parent
+            mbid = area_info.parent
             area_info.parent = area_id
             area_info.country = ''
-            DataCache.set_area_info(_id, area_info)
+            DataCache.set_area_info(mbid, area_info)
 
     @staticmethod
     def _parse_area(area_info: dict) -> Area:
@@ -1112,6 +1141,8 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         editor.exec()
 
     def open_cache_directory(self) -> None:
+        """Open the persistent cache file directory in system file browser.
+        """
         cache_dir = DataCache.cache_dir
         open_local_path(cache_dir)
 
@@ -1172,7 +1203,9 @@ class CacheEditorPage(PicardDialog):
         self.ui.b_filter_previous.clicked.connect(self.move_up)
         self.ui.b_filter_next.clicked.connect(self.move_down)
 
-    def load_artists(self):
+    def load_artists(self) -> None:
+        """Load the list of artists from the cache.
+        """
         self.ui.listWidget.clear()
         artists: dict = deepcopy(DataCache.cache['artist'])
         for artist_id, artist in sorted(artists.items(), key=lambda x: x[1]['sort-name']):
@@ -1182,17 +1215,23 @@ class CacheEditorPage(PicardDialog):
             item.setData(Qt.ItemDataRole.UserRole, artist_id)
             self.ui.listWidget.addItem(item)
         self.current_item = self.ui.listWidget.item(0)
+
+        # Initialize the normal and bold font definitions
         self.font_normal = self.current_item.font()
         self.font_bold = self.current_item.font()
         self.font_bold.setBold(True)
 
-    def _update_filter_status(self):
+    def _update_filter_status(self) -> None:
+        """Display count of filtered items.
+        """
         if self.ui.filter_text.text():
             self.ui.filter_status_label.setText(self.api.trn(*self._FILTER_STATUS_FILTERED, n=len(self.matched_items)))
         else:
             self.ui.filter_status_label.setText(self.api.tr(self._FILTER_STATUS_UNFILTERED))
 
-    def filter_changed(self):
+    def filter_changed(self) -> None:
+        """Process updated filter string.
+        """
         if self.ui.filter_text.text():
             self.matched_items = self.ui.listWidget.findItems(self.ui.filter_text.text(), Qt.MatchFlag.MatchContains)
         else:
@@ -1215,7 +1254,9 @@ class CacheEditorPage(PicardDialog):
         self.ui.b_filter_previous.setEnabled(False)
         self.ui.b_filter_next.setEnabled(len(self.matched_items) > 1)
 
-    def move_up(self):
+    def move_up(self) -> None:
+        """Move current item to the previous filtered item.
+        """
         current_index = self.ui.listWidget.currentRow()
         new_item = self.ui.listWidget.item(0)
         for item in reversed(self.matched_items):
@@ -1228,7 +1269,9 @@ class CacheEditorPage(PicardDialog):
                 continue
         self._move_current_item(new_item)
 
-    def move_down(self):
+    def move_down(self) -> None:
+        """Move current item to the next filtered item.
+        """
         current_index = self.ui.listWidget.currentRow()
         new_item = self.ui.listWidget.item(self.ui.listWidget.count() - 1)
         for item in self.matched_items:
@@ -1241,16 +1284,22 @@ class CacheEditorPage(PicardDialog):
                 continue
         self._move_current_item(new_item)
 
-    def _move_current_item(self, item: QtWidgets.QListWidgetItem):
+    def _move_current_item(self, item: QtWidgets.QListWidgetItem) -> None:
+        """Set the current item in the list.
+
+        Args:
+            item (QtWidgets.QListWidgetItem): Item to make current.
+        """
         self.ui.listWidget.setCurrentItem(item)
         self._set_up_down_states()
 
-    def _set_up_down_states(self):
+    def _set_up_down_states(self) -> None:
+        """Set the enabled states for the up and down buttons.
+        """
         if not self.matched_items:
             self.ui.b_filter_previous.setEnabled(False)
             self.ui.b_filter_next.setEnabled(False)
         else:
-            # current_index = self.matched_items.index(self.current_item)
             current_index = self.ui.listWidget.currentRow()
             first_index = self.ui.listWidget.row(self.matched_items[0])
             last_index = self.ui.listWidget.row(self.matched_items[-1])
@@ -1258,9 +1307,13 @@ class CacheEditorPage(PicardDialog):
             self.ui.b_filter_next.setEnabled(current_index < last_index)
 
     def list_item_changed(self, _item: QtWidgets.QListWidgetItem) -> None:
+        """Process when the current item has been checked or unchecked.
+        """
         self.update_checked_selector_state()
 
     def remove_artists(self) -> None:
+        """Remove the selected artists from the cache, display a results dialog and exit.
+        """
         count = self.get_checked_count()
         if count < 1:
             return
@@ -1288,18 +1341,20 @@ class CacheEditorPage(PicardDialog):
         self.close()
 
     def get_checked_count(self) -> int:
+        """Get the number of checked items in the list.
+        """
         count = 0
         for index in range(self.ui.listWidget.count()):
             if self.ui.listWidget.item(index).checkState() == Qt.CheckState.Checked:
                 count += 1
         return count
 
-    def selector_clicked(self):
+    def selector_clicked(self) -> None:
+        """Select or deselect all items when master selector checkbox is clicked.
+        """
         total = self.ui.listWidget.count()
         count = self.get_checked_count()
         set_state = Qt.CheckState.Checked if count < total else Qt.CheckState.Unchecked
-        # for item in self.ui.listWidget.items():
-        #     item: QtWidgets.QListWidgetItem
         for index in range(self.ui.listWidget.count()):
             item = self.ui.listWidget.item(index)
             item.setCheckState(set_state)
@@ -1309,6 +1364,8 @@ class CacheEditorPage(PicardDialog):
         self.ui.b_remove.setEnabled(count > 0)
 
     def update_checked_selector_state(self) -> None:
+        """Update the display state of the master selector checkbox.
+        """
         total = self.ui.listWidget.count()
         count = self.get_checked_count()
         self.ui.checked_count_label.setText(f"({count:,}/{total:,})")
@@ -1322,7 +1379,11 @@ class CacheEditorPage(PicardDialog):
 
 
 def enable(api: PluginApi) -> None:
-    """Called when plugin is enabled."""
+    """Called when the plugin is enabled.
+
+    Args:
+        api (PluginApi): The api for the plugin.
+    """
     # Initialize settings
     api.plugin_config.register_option(OPT_PROCESS_TRACKS, False)
     api.plugin_config.register_option(OPT_AREA_COUNTY, True)
@@ -1356,15 +1417,22 @@ def enable(api: PluginApi) -> None:
 
 
 def disable():
-    api = PluginApi.get_api()
+    """Called when plugin is enabled.
+    """
     # Save the cache to a file
     try:
         DataCache.save_cache()
     except CacheException as ex:
+        api = PluginApi.get_api()
         api.logger.error(str(ex))
 
 
 def migrate_settings(api: PluginApi) -> None:
+    """Migrate Picard 2.x settings if available.
+
+    Args:
+        api (PluginApi): The api for the plugin.
+    """
     if api.global_config.setting.raw_value('aad_process_tracks') is None:
         return
 
