@@ -1179,8 +1179,8 @@ class CacheEditorPage(PicardDialog):
 
         self.matched_items = []
 
-        icon_up = self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_ArrowUp)
-        icon_dn = self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_ArrowDown)
+        icon_up = self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarShadeButton)
+        icon_dn = self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarUnshadeButton)
         self.ui.b_filter_previous.setIcon(icon_up)
         self.ui.b_filter_next.setIcon(icon_dn)
 
@@ -1220,6 +1220,8 @@ class CacheEditorPage(PicardDialog):
         self.font_normal = self.current_item.font()
         self.font_bold = self.current_item.font()
         self.font_bold.setBold(True)
+
+        self._set_up_down_states()
 
     def _update_filter_status(self) -> None:
         """Display count of filtered items.
