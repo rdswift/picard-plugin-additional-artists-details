@@ -30,9 +30,9 @@
 "qt.AdditionalArtistsDetailsOptionsPage.page.title" = "Informations supplémentaires sur les artistes"
 "qt.AdditionalArtistsDetailsOptionsPage.section.cache.text" = "Les informations relatives à la région et (éventuellement) à l'artiste sont enregistrées dans un fichier de cache persistant afin d'être conservées d'une session Picard à l'autre. Cela permet de réduire considérablement le temps nécessaire au chargement d'un album en éliminant les appels API superflus pour des informations déjà récupérées. Les informations relatives à la région génèrent généralement le plus grand nombre d'appels API supplémentaires et constituent donc le principal facteur de retard lors du chargement d'un album. C'est pourquoi ces informations sont toujours enregistrées dans le fichier de cache persistant."
 "qt.AdditionalArtistsDetailsOptionsPage.section.cache.title" = "Cache persistant"
-"qt.AdditionalArtistsDetailsOptionsPage.section.include.text" = "Cette option permet de déterminer si les informations relatives au comté, à la commune et à la subdivision doivent être incluses dans les variables de localisation de l'artiste créées. Quels que soient ces paramètres, ces informations seront incluses si un comté, une commune ou une subdivision est la zone spécifiée pour un artiste."
+"qt.AdditionalArtistsDetailsOptionsPage.section.include.text" = "Ces options déterminent si les informations relatives au département, à la commune et à la subdivision sont incluses ou non dans les variables de localisation de l'artiste créées. Quels que soient ces paramètres, ces informations seront incluses si un département, une commune ou une subdivision est la zone spécifiée pour un artiste."
 "qt.AdditionalArtistsDetailsOptionsPage.section.include.title" = "Ajouter les détails du quartier"
-"qt.AdditionalArtistsDetailsOptionsPage.section.process.text" = "Ces options déterminent si les informations relatives au département, à la commune et à la subdivision sont incluses ou non dans les variables de localisation de l'artiste créées. Quels que soient ces paramètres, ces informations seront incluses si un département, une commune ou une subdivision est la zone spécifiée pour un artiste."
+"qt.AdditionalArtistsDetailsOptionsPage.section.process.text" = "Cette option permet de déterminer si les informations détaillées concernant tous les interprètes des titres d'un album doivent être récupérées ou non. Si vous ne souhaitez obtenir que les informations relatives aux interprètes de l'album, cette option doit être désactivée, ce qui réduira considérablement le nombre d'appels supplémentaires vers l'API MusicBrainz et le temps nécessaire au chargement d'un album. Les interprètes de l'album sont toujours traités."
 "qt.AdditionalArtistsDetailsOptionsPage.section.process.title" = "Exécuter artistes du morceau"
 "qt.AdditionalArtistsDetailsOptionsPage.tooltip.button.edit" = "Modifiez le cache pour supprimer les artistes afin qu'ils soient mis à jour."
 "qt.AdditionalArtistsDetailsOptionsPage.tooltip.button.export" = "Enregistrez le cache actuel dans un nouveau fichier de cache à des fins de sauvegarde ou de partage."
@@ -63,8 +63,8 @@ one = "({n} élément)"
 other = "({n} éléments)"
 
 ["ui.remove.confirmation.message"]
-one = "Vous êtes sur le point de supprimer {n} fiches d'artistes du cache. Voulez-vous continuer ?"
-other = "Vous êtes sur le point de supprimer {n} fiches d'artistes du cache. Voulez-vous continuer ?"
+one = "Vous êtes sur le point de supprimer {n} fiches d'artistes du cache.  Voulez-vous continuer ?"
+other = "Vous êtes sur le point de supprimer {n} fiches d'artistes du cache.  Voulez-vous continuer ?"
 
 
 
