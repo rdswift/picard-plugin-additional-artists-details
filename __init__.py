@@ -135,6 +135,21 @@ class MetadataPair:
     """Track metadata object to update"""
 
 
+@dataclass
+class AreaRelationship:
+    """Area relationship information"""
+    id: str = ''
+    """MBID of the area"""
+    name: str = ''
+    """Name of the area"""
+    type: str = ''
+    """MBID type code of the area"""
+    type_text: str = ''
+    """Text description of the area providing the relationship"""
+    direction: str = ''
+    """Direction of the relationship"""
+
+
 class Area:
     """Class to hold information about an area id"""
     def __init__(self, parent: str, name: str, country: str, area_type: str, type_text: str):
@@ -708,14 +723,41 @@ class ArtistDetailsPlugin:
                 if item in document and document[item] and 'id' in document[item] and document[item]['id']:
                     area_id = document[item]['id']
                     artist_info[item] = area_id
-                    if area_id not in self.cache_requests['area'] and area_id not in DataCache.cache['area']:
-                        self._get_area_info(area_id, album)
+                    self._queue_ancestors(area_id, album)
 
             DataCache.set_artist_info(artist_id=artist, artist_info=artist_info)
+
+        except Exception as ex:
+            self.api.logger.error("Error processing artist '%s' information: %s", artist, ex)
 
         finally:
             self.api.complete_album_task(album=album, task_id=task_id)
             self._album_remove_request(album)
+
+    def _queue_ancestors(self, area_id: str, album: Album) -> None:
+        """Queues the ancestor areas for processing.
+
+        Args:
+            area_id (str): MBID of the area to retrieve.
+            album (Album): The Album object to use for the processing.
+        """
+
+        while area_id:
+            if not area_id:
+                # No area ID to process.  Break out of the loop.
+                break
+
+            if area_id in self.cache_requests['area']:
+                # Area ID already queued for processing.  Break out of the loop.
+                break
+
+            if area_id not in DataCache.cache['area']:
+                # Area ID not in the cache.  Queue it for processing and break out of the loop.
+                self._get_area_info(area_id, album)
+                break
+
+            area_info = DataCache.get_area_info(area_id)
+            area_id = area_info.parent
 
     def _get_area_info(self, area_id: str, album: Album) -> None:
         """Gets the area information from the MusicBrainz website.
@@ -754,33 +796,74 @@ class ArtistDetailsPlugin:
                 self.api.logger.error("Area '%s' information retrieval error.", area)
                 return
 
-            area_info = self._parse_area(document)
-            new_id = area_info.parent
+            info = self._parse_area(document)
+            new_id = info.get('id', '')
+            if not info or not new_id:
+                self.api.logger.error("Area '%s' information invalid.", area)
+                return
 
-            if area_info.area_type == AREA_TYPE_COUNTRY and new_id not in DataCache.cache['area']:
-                self._area_logger(
-                    area_id=new_id,
-                    area_name=f"{area_info.name} ({area_info.country})",
-                    area_type=area_info.type_text,
+            parent_id = '' if info['type'] == AREA_TYPE_COUNTRY else self._get_area_parent(document)
+            area_info = Area(
+                parent=parent_id,
+                name=info['name'],
+                country=info['country'],
+                area_type=info['type'],
+                type_text=info['type_text'],
+            )
+            self._area_logger(
+                area_id=new_id,
+                area_name=info['name'],
+                area_type=info['type_text'],
+            )
+            DataCache.set_area_info(area_id=new_id, area_info=area_info)
+
+            for rel in document.get('relations', []):
+                area_rel = self._parse_area_forward_relationship(rel)
+                if not area_rel.id:
+                    continue
+                area_info = Area(
+                    parent=new_id,
+                    name=area_rel.name,
+                    country='',
+                    area_type=area_rel.type,
+                    type_text=area_rel.type_text,
                 )
-                area_info.parent = ''
-                DataCache.set_area_info(area_id=new_id, area_info=area_info)
+                self._area_logger(
+                    area_id=area_rel.id,
+                    area_name=area_rel.name,
+                    area_type=area_rel.type_text,
+                )
+                DataCache.set_area_info(area_id=area_rel.id, area_info=area_info)
 
-            if 'relations' in document:
-                for rel in document['relations']:
-                    self._parse_area_relation(
-                        area_id=new_id,
-                        area_relation=rel,
-                        album=album,
-                        area_name=area_info.name,
-                        area_type=area_info.area_type,
-                        area_type_text=area_info.type_text,
-                    )
+            # Set up requests for missing ancestors as required
+            self._queue_ancestors(parent_id, album)
+
+        except Exception as ex:
+            self.api.logger.error("Error processing area '%s' information: %s", area, ex)
 
         finally:
             self.api.complete_album_task(album=album, task_id=task_id)
             self._remove_album_area_request(album.id, area)
             self._album_remove_request(album)
+
+    @staticmethod
+    def _get_area_parent(document: dict) -> str:
+        """Get the parent area ID for a given area document.
+
+        Args:
+            document (dict): The area document.
+
+        Returns:
+            str: The parent area ID.
+        """
+        parent = ''
+        relations = document.get('relations', [])
+        for rel in relations:
+            if rel.get('type-id') == RELATIONSHIP_TYPE_PART_OF and rel.get('direction') == 'backward' and not rel.get('ended', False):
+                parent = rel.get('area', {}).get('id', '')
+                if parent:
+                    break
+        return parent
 
     def _area_logger(self, area_id: str, area_name: str, area_type: str) -> None:
         """Adds a log entry for the area retrieved.
@@ -792,98 +875,47 @@ class ArtistDetailsPlugin:
         """
         self._debug_logger(f"Adding area: {area_id} => \"{area_name}\" of type '{area_type}'")
 
-    def _parse_area_relation(self, area_id: str, area_relation: dict, album: Album, area_name: str,
-                             area_type: str, area_type_text: str) -> None:
-        """Parse an area relation to extract the area information.
+    def _parse_area_forward_relationship(self, area_relation: dict) -> AreaRelationship:
+        """Parse an area relation to extract the forward area relationship information.
 
         Args:
-            area_id (str): MBID of the area providing the relationship.
             area_relation (dict): Dictionary of the area relationship.
-            album (Album): The Album object to use for the processing.
-            area_name (str): Name of the area providing the relationship.
-            area_type (str): MBID of the type of area providing the relationship.
-            area_type_text (str): Text description of the area providing the relationship.
+
+        Returns:
+            AreaRelationship: Area relationship information.
         """
-        if 'type-id' not in area_relation or 'area' not in area_relation or area_relation['type-id'] != RELATIONSHIP_TYPE_PART_OF:
-            return
-
-        area_info = self._parse_area(area_relation['area'])
-
-        if not area_info.parent:
-            return
-
-        def _add_country(mbid, name, country, area_type, type_text):
-            if mbid not in DataCache.get_area_cache():
-                self._area_logger(mbid, f"{name} ({country})", type_text)
-                DataCache.set_area_info(mbid, Area('', name, country, area_type, type_text))
-                self.cache_requests['area'].add(mbid)
-
-        if 'direction' in area_relation and area_relation['direction'] == 'backward':
-            if area_id not in self.cache_requests['area']:
-                self._area_logger(area_id, area_name, area_type_text)
-                DataCache.set_area_info(
-                    area_id=area_id,
-                    area_info=Area(
-                        parent=area_info.parent,
-                        name=area_name,
-                        country='',
-                        area_type=area_type,
-                        type_text=area_type_text,
-                    )
-                )
-                self.cache_requests['area'].add(area_id)
-
-            if area_info.area_type == AREA_TYPE_COUNTRY:
-                _add_country(
-                    mbid=area_info.parent,
-                    name=area_info.name,
-                    country=area_info.country,
-                    area_type=area_info.area_type,
-                    type_text=area_info.type_text,
-                )
-
-            else:
-                if area_info.parent not in DataCache.cache['area'] and area_info.parent not in self.cache_requests['area']:
-                    self._get_area_info(area_info.parent, album)
-
-        elif 'direction' in area_relation and area_relation['direction'] == 'forward' and area_info.area_type == AREA_TYPE_COUNTRY:
-            _add_country(
-                mbid=area_info.parent,
-                name=area_info.name,
-                country=area_info.country,
-                area_type=area_info.area_type,
-                type_text=area_info.type_text,
-            )
-
-        else:
-            self._area_logger(
-                area_id=area_info.parent,
-                area_name=area_info.name,
-                area_type=area_info.type_text,
-            )
-            self.cache_requests['area'].add(area_info.parent)
-            mbid = area_info.parent
-            area_info.parent = area_id
-            area_info.country = ''
-            DataCache.set_area_info(mbid, area_info)
+        rel_type = area_relation.get('type-id', '')
+        rel_direction = area_relation.get('direction', '')
+        if rel_type != RELATIONSHIP_TYPE_PART_OF or rel_direction != 'forward':
+            return AreaRelationship()
+        area_info = self._parse_area(area_relation.get('area', {}))
+        if not area_info or not area_info.get('id'):
+            return AreaRelationship()
+        return AreaRelationship(
+            id=area_info.get('id', ''),
+            name=area_info.get('name', ''),
+            type=area_info.get('type', ''),
+            type_text=area_info.get('type_text', ''),
+            direction=rel_direction,
+        )
 
     @staticmethod
-    def _parse_area(area_info: dict) -> Area:
+    def _parse_area(area_info: dict) -> dict[str, str]:
         """Parse a dictionary of area information to return selected elements.
 
         Args:
             area_info (dict): Area information to parse.
 
         Returns:
-            tuple: Selected information for the area (id, name, country code, type code, type text).
+            dict[str, str]: Selected information for the area (id, name, country code, type code, type text).
         """
         if 'id' not in area_info:
-            return Area('', '', '', '', '')
+            return {}
 
         area_id = area_info['id']
-        area_name = area_info['name'] if 'name' in area_info else 'Unknown Name'
-        area_type = area_info['type-id'] if 'type-id' in area_info else ''
-        area_type_text = area_info['type'] if 'type' in area_info else 'Unknown Area Type'
+        area_name = area_info.get('name', 'Unknown Name')
+        area_type = area_info.get('type-id', '')
+        area_type_text = area_info.get('type', 'Unknown Area Type')
         country = ''
 
         if area_type == AREA_TYPE_COUNTRY:
@@ -892,7 +924,13 @@ class ArtistDetailsPlugin:
             elif ISO_CODES_2 in area_info and area_info[ISO_CODES_2]:
                 country = area_info[ISO_CODES_2][0][:2]
 
-        return Area(area_id, area_name, country, area_type, area_type_text)
+        return {
+            'id': area_id,
+            'name': area_name,
+            'country': country,
+            'type': area_type,
+            'type_text': area_type_text
+        }
 
     def _metadata_error(self, album_id: str, metadata_element: str, metadata_group: str) -> None:
         """Logs metadata-related errors.
@@ -924,13 +962,16 @@ class ArtistDetailsPlugin:
             country = area.country
             area_id = area.parent
 
+            if not area.name:
+                continue
+
             if not location or area.area_type not in CONDITIONAL_LOCATIONS:
                 location.append(area.name)
             else:
                 if (
                     (area.area_type == AREA_TYPE_COUNTY and self.api.plugin_config[OPT_AREA_COUNTY])
-                    or (area.type == AREA_TYPE_MUNICIPALITY and self.api.plugin_config[OPT_AREA_MUNICIPALITY])
-                    or (area.type == AREA_TYPE_SUBDIVISION and self.api.plugin_config[OPT_AREA_SUBDIVISION])
+                    or (area.area_type == AREA_TYPE_MUNICIPALITY and self.api.plugin_config[OPT_AREA_MUNICIPALITY])
+                    or (area.area_type == AREA_TYPE_SUBDIVISION and self.api.plugin_config[OPT_AREA_SUBDIVISION])
                 ):
                     location.append(area.name)
 
