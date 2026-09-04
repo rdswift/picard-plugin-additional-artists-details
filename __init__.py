@@ -41,7 +41,11 @@ from picard.plugin3.api import (
 )
 from picard.ui import PicardDialog
 from picard.ui.util import FileDialog
-from picard.util import open_local_path
+# TODO: Remove the following import check when Picard v3.0 is released.
+try:
+    from picard.util import open_local_path
+except ImportError:
+    from picard.ui.util import open_local_path
 from picard.webservice.api_helpers import MBAPIHelper
 
 from .ui_artists_cache_editor import Ui_AdditionalArtistsDetailsCacheEditor
