@@ -9,7 +9,7 @@
 from PyQt6 import QtCore, QtGui, QtWidgets  # noqa: F401
 
 
-class Ui_AdditionalArtistsDetailsCacheEditor(object):
+class Ui_AdditionalArtistsDetailsCacheEditor:
     def setupUi(self, AdditionalArtistsDetailsCacheEditor):
         AdditionalArtistsDetailsCacheEditor.setObjectName("AdditionalArtistsDetailsCacheEditor")
         AdditionalArtistsDetailsCacheEditor.resize(561, 511)
@@ -33,7 +33,9 @@ class Ui_AdditionalArtistsDetailsCacheEditor(object):
         self.format_description.setWordWrap(True)
         self.format_description.setObjectName("format_description")
         self.verticalLayout.addWidget(self.format_description)
-        spacerItem = QtWidgets.QSpacerItem(20, 6, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
+        spacerItem = QtWidgets.QSpacerItem(
+            20, 6, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed
+        )
         self.verticalLayout.addItem(spacerItem)
         self.artists_list_title = QtWidgets.QLabel(parent=AdditionalArtistsDetailsCacheEditor)
         font = QtGui.QFont()
@@ -44,7 +46,9 @@ class Ui_AdditionalArtistsDetailsCacheEditor(object):
         self.horizontalLayout = QtWidgets.QHBoxLayout()
         self.horizontalLayout.setContentsMargins(-1, 0, -1, -1)
         self.horizontalLayout.setObjectName("horizontalLayout")
-        spacerItem1 = QtWidgets.QSpacerItem(4, 20, QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Minimum)
+        spacerItem1 = QtWidgets.QSpacerItem(
+            4, 20, QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Minimum
+        )
         self.horizontalLayout.addItem(spacerItem1)
         self.cb_select_all = QtWidgets.QCheckBox(parent=AdditionalArtistsDetailsCacheEditor)
         self.cb_select_all.setText("")
@@ -54,7 +58,9 @@ class Ui_AdditionalArtistsDetailsCacheEditor(object):
         self.checked_count_label = QtWidgets.QLabel(parent=AdditionalArtistsDetailsCacheEditor)
         self.checked_count_label.setObjectName("checked_count_label")
         self.horizontalLayout.addWidget(self.checked_count_label)
-        spacerItem2 = QtWidgets.QSpacerItem(20, 20, QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Minimum)
+        spacerItem2 = QtWidgets.QSpacerItem(
+            20, 20, QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Minimum
+        )
         self.horizontalLayout.addItem(spacerItem2)
         self.filter_label = QtWidgets.QLabel(parent=AdditionalArtistsDetailsCacheEditor)
         self.filter_label.setObjectName("filter_label")
@@ -82,7 +88,9 @@ class Ui_AdditionalArtistsDetailsCacheEditor(object):
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_2.setContentsMargins(-1, 0, -1, -1)
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
-        spacerItem3 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
+        spacerItem3 = QtWidgets.QSpacerItem(
+            40, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum
+        )
         self.horizontalLayout_2.addItem(spacerItem3)
         self.b_remove = QtWidgets.QPushButton(parent=AdditionalArtistsDetailsCacheEditor)
         self.b_remove.setObjectName("b_remove")
@@ -103,14 +111,18 @@ class Ui_AdditionalArtistsDetailsCacheEditor(object):
 
     def retranslateUi(self, AdditionalArtistsDetailsCacheEditor):
         _translate = QtCore.QCoreApplication.translate
-        AdditionalArtistsDetailsCacheEditor.setWindowTitle(_translate("AdditionalArtistsDetailsCacheEditor", "window.title"))
+        AdditionalArtistsDetailsCacheEditor.setWindowTitle(
+            _translate("AdditionalArtistsDetailsCacheEditor", "window.title")
+        )
         self.page_title.setText(_translate("AdditionalArtistsDetailsCacheEditor", "page.title"))
         self.format_description.setText(_translate("AdditionalArtistsDetailsCacheEditor", "page.description"))
         self.artists_list_title.setText(_translate("AdditionalArtistsDetailsCacheEditor", "artists_list.title"))
         self.checked_count_label.setText(_translate("AdditionalArtistsDetailsCacheEditor", "(0/0)"))
         self.filter_label.setText(_translate("AdditionalArtistsDetailsCacheEditor", "label.filter"))
         self.filter_text.setToolTip(_translate("AdditionalArtistsDetailsCacheEditor", "tooltip.filter_text"))
-        self.filter_text.setPlaceholderText(_translate("AdditionalArtistsDetailsCacheEditor", "placeholder.filter_text"))
+        self.filter_text.setPlaceholderText(
+            _translate("AdditionalArtistsDetailsCacheEditor", "placeholder.filter_text")
+        )
         self.b_filter_previous.setToolTip(_translate("AdditionalArtistsDetailsCacheEditor", "tooltip.filter_previous"))
         self.b_filter_previous.setText(_translate("AdditionalArtistsDetailsCacheEditor", "..."))
         self.b_filter_next.setToolTip(_translate("AdditionalArtistsDetailsCacheEditor", "tooltip.filter_next"))

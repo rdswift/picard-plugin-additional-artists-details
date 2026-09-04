@@ -1,4 +1,4 @@
-"""Additional Artists Details"""
+"""Additional Artists Details Picard Plugin"""
 
 # Copyright (C) 2023-2026 Bob Swift (rdswift)
 #
@@ -15,32 +15,34 @@
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, see <https://www.gnu.org/licenses/>.
 
-
-from copy import deepcopy
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
-import json
 import os
 import threading
-from typing import Callable
 
 from PyQt6 import QtWidgets
 from PyQt6.QtCore import (
     QStandardPaths,
     Qt,
+    QTimer,
 )
 
 from picard.debug_opts import DebugOpt
 from picard.plugin3.api import (
     Album,
+    BaseAction,
     Metadata,
     OptionsPage,
     PluginApi,
     Track,
     t_,
 )
+
 from picard.ui import PicardDialog
 from picard.ui.util import FileDialog
+
+
 # TODO: Remove the following import check when Picard v3.0 is released.
 try:
     from picard.util import open_local_path
@@ -48,24 +50,33 @@ except ImportError:
     from picard.ui.util import open_local_path
 from picard.webservice.api_helpers import MBAPIHelper
 
+from .cache import DataCache
+from .common import SharedVars
+from .const import (
+    BASE_FILENAME,
+    DB_DIR,
+    DB_FILE,
+    DEF_DIR,
+    RELATIONSHIP_TYPE_PART_OF,
+    USER_GUIDE_URL,
+)
+from .db_utils import DatabaseUtils
+from .entities import (
+    AreaEntity,
+    AreaType,
+)
+from .misc_utils import (
+    area_dict_to_entity,
+    artist_dict_to_entity,
+    artist_entity_to_key_value_pairs,
+    is_valid_mbid,
+)
 from .ui_artists_cache_editor import Ui_AdditionalArtistsDetailsCacheEditor
+from .ui_cache_status import Ui_AdditionalArtistsDetailsCacheStatus
 from .ui_options_additional_artists_details import Ui_AdditionalArtistsDetailsOptionsPage
 
 
-USER_GUIDE_URL = 'https://picard-plugins-user-guides.readthedocs.io/en/latest/additional_artists_details/user_guide.html'
-
-# MusicBrainz ID codes for relationship types
-RELATIONSHIP_TYPE_PART_OF = 'de7cc874-8b1b-3a05-8272-f3834c968fb7'
-
-# MusicBrainz ID codes for area types
-AREA_TYPE_COUNTRY = '06dd0ae4-8c74-30bb-b43d-95dcedf961de'
-AREA_TYPE_COUNTY = 'bcecec27-8bdb-3e00-8254-d948dda502fa'
-AREA_TYPE_MUNICIPALITY = '17246454-5ac4-36a1-b81a-4753eb2dab20'
-AREA_TYPE_SUBDIVISION = 'fd3d44c5-80a1-3842-9745-2c4972d35afa'
-
-CONDITIONAL_LOCATIONS = {AREA_TYPE_COUNTY, AREA_TYPE_MUNICIPALITY, AREA_TYPE_SUBDIVISION}
-
-# Standard text for arguments
+# Standard text for arguments while parsing MusicBrainz data
 ALBUM_ARTISTS = 'album_artists'
 ARTIST = 'artist'
 ARTIST_REQUESTS = 'artist_requests'
@@ -82,16 +93,25 @@ OPT_AREA_SUBDIVISION = 'area_subdivision'
 OPT_PROCESS_TRACKS = 'process_tracks'
 OPT_SAVE_ARTISTS_IN_CACHE = 'save_artists_cache'
 OPT_USE_CACHE = 'use_cache'
+OPT_BACKGROUND_FETCH_AREAS = 'background_fetch'
+OPT_BACKGROUND_FETCH_INTERVAL = 'background_fetch_interval'
 
 lock = threading.Lock()
 
 
 class CustomHelper(MBAPIHelper):
-    """Custom MusicBrainz API helper to retrieve artist and area information.
-    """
+    """Custom MusicBrainz API helper to retrieve artist and area information."""
 
-    def get_artist_by_id(self, mbid: str, handler: Callable, inc: list = None, priority: bool = False, important:bool = False,
-                         mblogin: bool = False, refresh: bool = False):
+    def get_artist_by_id(
+        self,
+        mbid: str,
+        handler: Callable,
+        inc: list = None,
+        priority: bool = False,
+        important: bool = False,
+        mblogin: bool = False,
+        refresh: bool = False,
+    ):
         """Get information for the specified artist MBID.
 
         Args:
@@ -106,10 +126,27 @@ class CustomHelper(MBAPIHelper):
         Returns:
             PendingRequest: Requested task object.
         """
-        return self._get_by_id(ARTIST, mbid, handler, inc, priority=priority, important=important, mblogin=mblogin, refresh=refresh)
+        return self._get_by_id(
+            ARTIST,
+            mbid,
+            handler,
+            inc,
+            priority=priority,
+            important=important,
+            mblogin=mblogin,
+            refresh=refresh,
+        )
 
-    def get_area_by_id(self, mbid: str, handler: Callable, inc: list = None, priority: bool = False, important: bool = False,
-                       mblogin: bool = False, refresh: bool = False):
+    def get_area_by_id(
+        self,
+        mbid: str,
+        handler: Callable,
+        inc: list = None,
+        priority: bool = False,
+        important: bool = False,
+        mblogin: bool = False,
+        refresh: bool = False,
+    ):
         """Get information for the specified area MBID.
 
         Args:
@@ -127,14 +164,25 @@ class CustomHelper(MBAPIHelper):
         if inc is None:
             inc = ['area-rels']
 
-        return self._get_by_id(AREA, mbid, handler, inc, priority=priority, important=important, mblogin=mblogin, refresh=refresh)
+        return self._get_by_id(
+            AREA,
+            mbid,
+            handler,
+            inc,
+            priority=priority,
+            important=important,
+            mblogin=mblogin,
+            refresh=refresh,
+        )
 
 
 @dataclass
 class MetadataPair:
     """Track metadata pair"""
+
     artists: set
-    """Artists on the track"""
+    """MBIDs of artists on the track"""
+
     target: Metadata
     """Track metadata object to update"""
 
@@ -142,316 +190,81 @@ class MetadataPair:
 @dataclass
 class AreaRelationship:
     """Area relationship information"""
+
     id: str = ''
     """MBID of the area"""
+
     name: str = ''
     """Name of the area"""
+
     type: str = ''
     """MBID type code of the area"""
+
     type_text: str = ''
     """Text description of the area providing the relationship"""
+
     direction: str = ''
     """Direction of the relationship"""
 
 
-class Area:
-    """Class to hold information about an area id"""
-    def __init__(self, parent: str, name: str, country: str, area_type: str, type_text: str):
-        """Initialize an Area class object.
-
-        Args:
-            parent (str): MBID of the area's parent.
-            name (str): Name of the area.
-            country (str): Two-character country code if the area is a coountry, otherwise an empty string.
-            area_type (str): MBID type code of the area.
-            type_text (str): Text of the area's type.
-        """
-        self.parent = parent
-        self.name = name
-        self.country = country
-        self.area_type = area_type
-        self.type_text = type_text
-
-    def as_dict(self) -> dict:
-        """Return the instance as a dictionary.
-
-        Returns:
-            dict: Dictionary of the area information.
-        """
-        return {
-            'parent': self.parent,
-            'name': self.name,
-            'country': self.country,
-            'area_type': self.area_type,
-            'type_text': self.type_text,
-        }
-
-    @classmethod
-    def from_dict(cls, area_dict: dict) -> 'Area':
-        """Create an Area object from a dictionary.
-
-        Args:
-            area_dict (dict): Dictionary of the area information.  Must include 'parent' (MBID of the area's parent),
-            'name' (name of the area), 'country' (2-character country code), 'area_type' (the area's type code MBID),
-            and 'type_text' (text of the area's type) elements.
-
-        Returns:
-            Area: The Area object based on the input dictionary.
-        """
-        return Area(
-            parent=area_dict['parent'],
-            name=area_dict['name'],
-            country=area_dict['country'],
-            area_type=area_dict['area_type'],
-            type_text=area_dict['type_text'],
-        )
-
-
-class CacheException(Exception):
-    """Custom exception for the cache"""
-
-
-class DataCache:
-    FILE_PROCESSING_EXCEPTION_MESSAGE = "Cache file processing already in progress."
-    cache: dict[str, dict] = {
-        'artist': {},
-        'area': {},
-    }
-    is_dirty: bool = False
-    _file_processing: bool = False
-    cache_dir: str = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppDataLocation)
-    cache_file: str = os.path.join(cache_dir, 'aad_cache.json')
-    save_artists: bool = True
-    use_persistent_cache: bool = True
-
-    @classmethod
-    def get_artist_cache(cls) -> dict:
-        """Get the artist cache dictionary.
-
-        Returns:
-            dict: Artist information in the cache.
-        """
-        with lock:
-            return cls.cache['artist']
-
-    @classmethod
-    def get_area_cache(cls) -> dict:
-        """Get the area cache dictionary.
-
-        Returns:
-            dict: Area information in the cache.
-        """
-        with lock:
-            return cls.cache['area']
-
-    @classmethod
-    def set_artist_info(cls, artist_id: str, artist_info: dict) -> None:
-        """Set the artist information in the cache.
-
-        Args:
-            artist_id (str): MBID of the artist.
-            artist_info (dict): Artist information to store.
-        """
-        with lock:
-            cls.cache['artist'][artist_id] = artist_info
-            cls.is_dirty = True
-
-    @classmethod
-    def remove_artist_info(cls, artist_id: str) -> None:
-        """Remove the specified artist information from the cache.
-
-        Args:
-            artist_id (str): MBID of the artist.
-        """
-        with lock:
-            if artist_id in cls.cache['artist']:
-                del cls.cache['artist'][artist_id]
-                cls.is_dirty = True
-
-    @classmethod
-    def get_artist_info(cls, artist_id: str) -> dict[str, dict]:
-        """Get the dictionary of information for an artist.
-
-        Args:
-            artist_id (str): MBID of the artist.
-
-        Returns:
-            dict: Artist information. Empty dictionary if the artist is not in the cache.
-        """
-        with lock:
-            return deepcopy(cls.cache['artist'][artist_id]) if artist_id in cls.cache['artist'] else {}
-
-    @classmethod
-    def set_area_info(cls, area_id: str, area_info: Area | dict) -> None:
-        """Set the area information in the cache.
-
-        Args:
-            area_id (str): MBID of the area.
-            area_info (Area | dict): Area information to store.
-        """
-        with lock:
-            cls.cache['area'][area_id] = area_info.as_dict() if isinstance(area_info, Area) else area_info
-            cls.is_dirty = True
-
-    @classmethod
-    def get_area_info(cls, area_id: str) -> Area:
-        """Get the information for an area.
-
-        Args:
-            area_id (str): MBID of the area.
-
-        Returns:
-            Area: Area information. Empty Area object if the area is not in the cache.
-        """
-        if area_id not in cls.cache['area']:
-            return Area('', '', '', '', '')
-        with lock:
-            return Area.from_dict(cls.cache['area'][area_id])
-
-    @classmethod
-    def _load_cache(cls, filename: str | None = None) -> None:
-        """Add missing cache items from file.
-        """
-        with open(filename or cls.cache_file, 'r', encoding='utf8') as f:
-            info_dict = json.load(fp=f)
-
-        if 'artist' in info_dict:
-            for key, value in info_dict['artist'].items():
-                if key not in cls.cache['artist']:
-                    cls.set_artist_info(key, value)
-
-        if 'area' in info_dict:
-            for key, value in info_dict['area'].items():
-                if key not in cls.cache['area']:
-                    cls.set_area_info(key, value)
-
-    @classmethod
-    def _save_cache(cls, filename: str | None = None, save_artists: bool = True) -> None:
-        """Save cache items to file.
-        """
-        cache = deepcopy(cls.cache)
-        if not save_artists:
-            cache['artist'] = {}
-        with open(filename or cls.cache_file, 'w', encoding='utf8') as f:
-            json.dump(cache, fp=f, indent=4, sort_keys=True)
-
-    @classmethod
-    def load_cache(cls) -> None:
-        """Loads the cache from the persistent cache file.
-        """
-        if cls._file_processing:
-            raise CacheException(cls.FILE_PROCESSING_EXCEPTION_MESSAGE)
-
-        cls._file_processing = True
-        try:
-            cls._load_cache()
-        except (KeyError, FileNotFoundError, OSError, json.JSONDecodeError) as ex:
-            raise CacheException(f"Error loading cache: {ex}")
-        finally:
-            cls._file_processing = False
-
-    @classmethod
-    def save_cache(cls, save_artists: bool | None = None) -> None:
-        """Save the cache to the persistent cache file.
-        """
-        if not cls.use_persistent_cache:
-            return
-
-        error_prefix = "Error saving cache:"
-        if not cls.is_dirty:
-            raise CacheException("Cache has not changed.  Save canceled.")
-
-        if cls._file_processing:
-            raise CacheException(f"{error_prefix} {cls.FILE_PROCESSING_EXCEPTION_MESSAGE}")
-
-        cls._file_processing = True
-
-        artists_save = cls.save_artists if save_artists is None else save_artists
-        try:
-            cls._save_cache(save_artists=artists_save)
-            cls.is_dirty = False
-        except (OSError, TypeError, RecursionError, ValueError) as ex:
-            raise CacheException(f"{error_prefix} {ex}")
-        finally:
-            cls._file_processing = False
-
-    @classmethod
-    def import_cache(cls, filename: str) -> None:
-        """Import new items into the cache from the specified cache file. Save the cache to the
-        persistent cache file if new information was added.
-
-        Args:
-            filename (str): Path and name of the cache file to import.
-        """
-        cls._load_cache(filename=filename)
-        if cls.is_dirty:
-            cls.save_cache()
-
-    @classmethod
-    def export_cache(cls, filename: str, save_artists: bool = True) -> None:
-        """Export the current cache to the specified cache file.
-
-        Args:
-            filename (str): Path and name of the cache file to export.
-        """
-        if not cls.use_persistent_cache:
-            return
-
-        cls._save_cache(filename=filename, save_artists=save_artists)
-
-
 class ArtistDetailsPlugin:
-    """Plugin to retrieve artist details, including area and country information.
-    """
-
-    # Area types to exclude from the location string
-    EXCLUDE_AREA_TYPES = {AREA_TYPE_MUNICIPALITY, AREA_TYPE_COUNTY, AREA_TYPE_SUBDIVISION}
+    """Plugin to retrieve artist details, including area and country information."""
 
     cache_requests: dict[str, set] = {
         'artist': set(),
         'area': set(),
     }
+    """Dictionary of album and area requests from MusicBrainz"""
+
     album_processing_count: dict[str, int] = {}
+    """Dictionary of number of outstanding requests by album MBID"""
+
     albums: dict = {}
+    """Dictionary of albums being processed"""
+
     album_area_requests: dict[str, set] = {}
+    """Dictionary of the outstanding area requests by album MBID"""
 
-    def __init__(self, api: PluginApi) -> None:
-        self.api = api
-        self.has_debug_if = hasattr(api.logger, 'debug_if')
+    has_debug_if = False
+    """PluginAPI logger supports `debug_if()`"""
 
-    def _debug_logger(self, text: str) -> None:
+    @classmethod
+    def _debug_logger(cls, text: str) -> None:
         """Debug logging helper to use `debug_if()` if available.
 
         Args:
             text (str): Message to log.
         """
-        if self.has_debug_if:
-            self.api.logger.debug_if(DebugOpt.PLUGIN_DEVELOPMENT, text)
+        if cls.has_debug_if:
+            SharedVars.api.logger.debug_if(DebugOpt.PLUGIN_DEVELOPMENT, text)
         else:
-            self.api.logger.debug(text)
+            SharedVars.api.logger.debug(text)
 
-    def _add_album_area_request(self, album_id: str, area_id: str) -> None:
+    @classmethod
+    def _add_album_area_request(cls, album_id: str, area_id: str) -> None:
         """Add an album area request.
 
         Args:
             album_id (str): MBID of the album
             area_id (str): MBID of the area
         """
-        if album_id not in self.album_area_requests:
-            self.album_area_requests[album_id] = set()
-        self.album_area_requests[album_id].add(area_id)
+        if album_id not in cls.album_area_requests:
+            cls.album_area_requests[album_id] = set()
+        cls.album_area_requests[album_id].add(area_id)
 
-    def _remove_album_area_request(self, album_id: str, area_id: str) -> None:
+    @classmethod
+    def _remove_album_area_request(cls, album_id: str, area_id: str) -> None:
         """Remove an album area request.
 
         Args:
             album_id (str): MBID of the album
             area_id (str): MBID of the area
         """
-        if album_id in self.album_area_requests:
-            self.album_area_requests[album_id].discard(area_id)
+        if album_id in cls.album_area_requests:
+            cls.album_area_requests[album_id].discard(area_id)
 
-    def _get_album_area_request_count(self, album_id: str) -> int:
+    @classmethod
+    def _get_album_area_request_count(cls, album_id: str) -> int:
         """Get the count of the current album area requests.
 
         Args:
@@ -460,20 +273,22 @@ class ArtistDetailsPlugin:
         Returns:
             int: Number of current requests
         """
-        if album_id not in self.album_area_requests:
+        if album_id not in cls.album_area_requests:
             return 0
-        return len(self.album_area_requests[album_id])
+        return len(cls.album_area_requests[album_id])
 
-    def _make_empty_target(self, album_id: str) -> None:
+    @classmethod
+    def _make_empty_target(cls, album_id: str) -> None:
         """Create an empty album target node if it doesn't exist.
 
         Args:
             album_id (str): MBID of the album.
         """
-        if album_id not in self.albums:
-            self.albums[album_id] = {ALBUM_ARTISTS: set(), TRACKS: []}
+        if album_id not in cls.albums:
+            cls.albums[album_id] = {ALBUM_ARTISTS: set(), TRACKS: []}
 
-    def _add_target(self, album_id: str, artists: set, target_metadata: Metadata) -> None:
+    @classmethod
+    def _add_target(cls, album_id: str, artists: set, target_metadata: Metadata) -> None:
         """Add a metadata target to update for an album.
 
         Args:
@@ -481,63 +296,69 @@ class ArtistDetailsPlugin:
             artists (set): Set of artists to include.
             target_metadata (Metadata): Target metadata to update.
         """
-        self._make_empty_target(album_id)
-        self.albums[album_id][TRACKS].append(MetadataPair(artists, target_metadata))
+        cls._make_empty_target(album_id)
+        cls.albums[album_id][TRACKS].append(MetadataPair(artists, target_metadata))
 
-    def _remove_album(self, album_id: str) -> None:
+    @classmethod
+    def _remove_album(cls, album_id: str) -> None:
         """Removes an album from the metadata processing dictionary.
 
         Args:
             album_id (str): MBID of the album to remove.
         """
-        self._debug_logger(f"Removing album '{album_id}'")
-        self.albums.pop(album_id, None)
-        self.album_processing_count.pop(album_id, None)
+        cls._debug_logger(f"Removing album '{album_id}'")
+        cls.albums.pop(album_id, None)
+        cls.album_processing_count.pop(album_id, None)
 
-    def _album_add_request(self, album: Album) -> None:
+    @classmethod
+    def _album_add_request(cls, album: Album) -> None:
         """Increment the number of pending requests for an album.
 
         Args:
             album (Album): The Album object to use for the processing.
         """
-        if album.id not in self.album_processing_count:
-            self.album_processing_count[album.id] = 0
-        self.album_processing_count[album.id] += 1
+        if album.id not in cls.album_processing_count:
+            cls.album_processing_count[album.id] = 0
+        cls.album_processing_count[album.id] += 1
 
-    def _album_remove_request(self, album: Album) -> None:
+    @classmethod
+    def _album_remove_request(cls, album: Album) -> None:
         """Decrement the number of pending requests for an album.  Trigger
         album finalization if there are no outstanding requests.
 
         Args:
             album (api.Album): The Album object to use for the processing.
         """
-        if album.id not in self.album_processing_count:
-            self.album_processing_count[album.id] = 1
-        self.album_processing_count[album.id] -= 1
+        if album.id not in cls.album_processing_count:
+            cls.album_processing_count[album.id] = 1
+        cls.album_processing_count[album.id] -= 1
 
-        if self.album_processing_count[album.id]:
+        if cls.album_processing_count[album.id]:
             return
 
-        self._debug_logger(f"Finalizing loading of album: {album}")
-        if self._save_artist_metadata(album):
+        cls._debug_logger(f"Finalizing loading of album: {album}")
+        if cls._save_artist_metadata(album):
             album._finalize_loading(None)
 
-        # Save the cache to the persistent cache file
-        try:
-            DataCache.save_cache()
-        except CacheException as ex:
-            self.api.logger.error(str(ex))
+        for count in cls.album_processing_count.values():
+            if count:
+                return
 
-    def remove_album(self, _api: PluginApi, album: Album) -> None:
+        # Start / restart orphan area processing
+        cls.process_orphan_areas()
+
+    @classmethod
+    def remove_album(cls, _api: PluginApi, album: Album) -> None:
         """Remove the album from the albums processing dictionary.
 
         Args:
             _api (PluginApi): The plugin API object.
             album (Album): The album object to remove.
         """
-        self._remove_album(album.id)
+        cls._remove_album(album.id)
 
-    def make_album_vars(self, _api: PluginApi, album: Album, album_metadata, _release_node: dict) -> None:
+    @classmethod
+    def make_album_vars(cls, _api: PluginApi, album: Album, album_metadata, _release_node: dict) -> None:
         """Process album artists.
 
         Args:
@@ -546,17 +367,18 @@ class ArtistDetailsPlugin:
             album_metadata (Metadata): Metadata object for the album.
             _release_metadata (dict): Dictionary of release data from MusicBrainz api.
         """
-        self._debug_logger(f"Processing album: {album.id}")
+        cls._debug_logger(f"Processing album: {album.id}")
         artists = set(artist.id for artist in album.get_album_artists())
-        self._make_empty_target(album.id)
-        self.albums[album.id][ALBUM_ARTISTS] = artists
+        cls._make_empty_target(album.id)
+        cls.albums[album.id][ALBUM_ARTISTS] = artists
 
-        if not self.api.plugin_config[OPT_PROCESS_TRACKS]:
-            self.api.logger.info("Track artist processing is disabled.")
+        if not SharedVars.api.plugin_config[OPT_PROCESS_TRACKS]:
+            SharedVars.api.logger.info("Track artist processing is disabled.")
 
-        self._artist_processing(artists, album, album_metadata, 'Album')
+        cls._artist_processing(artists, album, album_metadata, 'Album')
 
-    def _set_track_with_no_artists(self, track: Track, track_metadata: Metadata) -> None:
+    @classmethod
+    def _set_track_with_no_artists(cls, track: Track, track_metadata: Metadata) -> None:
         """Set the track metadata using the album artist if no artists identified for the track.
 
         Args:
@@ -564,12 +386,19 @@ class ArtistDetailsPlugin:
             track_metadata (Metadata): Metadata object to update.
         """
         album = track.album
-        for artist in self.albums[album.id][ALBUM_ARTISTS]:
-            self._set_artist_metadata(track_metadata, artist)
+        for artist in cls.albums[album.id][ALBUM_ARTISTS]:
+            cls._set_artist_metadata(track_metadata, artist)
         return
 
-    def make_track_vars(self, _api: PluginApi, track: Track, track_metadata: Metadata,
-                        track_node: dict, _release_node: dict) -> None:
+    @classmethod
+    def make_track_vars(
+        cls,
+        _api: PluginApi,
+        track: Track,
+        track_metadata: Metadata,
+        track_node: dict,
+        _release_node: dict,
+    ) -> None:
         """Process track artists.
 
         Args:
@@ -579,8 +408,8 @@ class ArtistDetailsPlugin:
             track_node (dict): Dictionary of track data from MusicBrainz api.
             _release_node (dict): Dictionary of release data from MusicBrainz api.
         """
-        if not self.api.plugin_config[OPT_PROCESS_TRACKS]:
-            self._set_track_with_no_artists(track, track_metadata)
+        if not SharedVars.api.plugin_config[OPT_PROCESS_TRACKS]:
+            cls._set_track_with_no_artists(track, track_metadata)
             return
 
         artists = set()
@@ -596,18 +425,25 @@ class ArtistDetailsPlugin:
                         artists.add(artist_credit['artist']['id'])
                 else:
                     # No 'artist' specified.  Log as an error.
-                    self._metadata_error(album.id, 'artist-credit.artist', source_type)
+                    cls._metadata_error(album.id, 'artist-credit.artist', source_type)
         else:
             # No valid metadata found.  Log as error.
-            self._metadata_error(album.id, 'artist-credit', source_type)
+            cls._metadata_error(album.id, 'artist-credit', source_type)
 
         if not artists:
-            self._set_track_with_no_artists(track, track_metadata)
+            cls._set_track_with_no_artists(track, track_metadata)
             return
 
-        self._artist_processing(artists, album, track_metadata, 'Track')
+        cls._artist_processing(artists, album, track_metadata, 'Track')
 
-    def _artist_processing(self, artists: set, album: Album, destination_metadata: Metadata, source_type: str) -> None:
+    @classmethod
+    def _artist_processing(
+        cls,
+        artists: set[str],
+        album: Album,
+        destination_metadata: Metadata,
+        source_type: str,
+    ) -> None:
         """Retrieves the information for each artist not already processed.
 
         Args:
@@ -617,17 +453,18 @@ class ArtistDetailsPlugin:
             source_type (str): Source type ('album' or 'track') for logging messages.
         """
         for temp_id in artists:
-            if temp_id not in self.cache_requests['artist'] and temp_id not in DataCache.cache['artist']:
-                self.cache_requests['artist'].add(temp_id)
-                self.api.logger.debug('Retrieving artist ID %s information from MusicBrainz.', temp_id)
-                self._get_artist_info(temp_id, album)
+            if temp_id not in cls.cache_requests['artist'] and DataCache.get_artist_info(temp_id) is None:
+                cls.cache_requests['artist'].add(temp_id)
+                SharedVars.api.logger.debug('Retrieving artist ID %s information from MusicBrainz.', temp_id)
+                cls._get_artist_info(temp_id, album)
             else:
-                self._debug_logger(f"{source_type} artist ID {temp_id} information available from cache.")
+                cls._debug_logger(f"{source_type} artist ID {temp_id} information available from cache.")
 
-        self._add_target(album.id, artists, destination_metadata)
-        self._save_artist_metadata(album)
+        cls._add_target(album.id, artists, destination_metadata)
+        cls._save_artist_metadata(album)
 
-    def _save_artist_metadata(self, album: Album) -> bool:
+    @classmethod
+    def _save_artist_metadata(cls, album: Album) -> bool:
         """Saves the new artist details variables to the metadata targets for the specified album.
 
         Args:
@@ -635,110 +472,120 @@ class ArtistDetailsPlugin:
         """
         album_id = album.id
 
-        if album_id in self.album_processing_count and self.album_processing_count[album_id]:
+        if album_id in cls.album_processing_count and cls.album_processing_count[album_id]:
             return False
 
-        if self._get_album_area_request_count(album_id):
+        if cls._get_album_area_request_count(album_id):
             return False
 
-        if album_id not in self.albums or not self.albums[album_id][TRACKS]:
-            self.api.logger.error("No metadata targets found for album '%s'", album_id)
+        if album_id not in cls.albums or not cls.albums[album_id][TRACKS]:
+            SharedVars.api.logger.error("No metadata targets found for album '%s'", album_id)
             return False
 
-        for item in self.albums[album_id][TRACKS]:
+        for item in cls.albums[album_id][TRACKS]:
             item: MetadataPair
             # Add album artists to track so they are available in the metadata
-            artists = self.albums[album_id][ALBUM_ARTISTS].copy().union(item.artists)
+            artists = cls.albums[album_id][ALBUM_ARTISTS].copy().union(item.artists)
             destination_metadata = item.target
             for artist in artists:
-                if artist in self.cache_requests['artist'] or artist in DataCache.cache['artist']:
-                    self._set_artist_metadata(destination_metadata, artist)
+                if artist in cls.cache_requests['artist'] or DataCache.get_artist_info(artist) is not None:
+                    cls._set_artist_metadata(destination_metadata, artist)
 
         return True
 
-    def _set_artist_metadata(self, destination_metadata: Metadata, artist_id: str) -> None:
+    @classmethod
+    def _set_artist_metadata(cls, destination_metadata: Metadata, artist_id: str) -> None:
         """Adds the artist information to the destination metadata.
 
         Args:
             destination_metadata (Metadata): Metadata object to update with new variables.
             artist_id (str): MBID of the artist to update.
         """
+
         def _set_item(key: str, value: str):
             key_ = f"~artist_{artist_id}_{key.replace('-', '_')}"
             destination_metadata[key_] = value
 
         artist_info = DataCache.get_artist_info(artist_id)
 
-        for item in artist_info.keys():
-            if item in {'area', 'begin-area', 'end-area'}:
-                country, location = self._drill_area(artist_info[item])
-                if country:
-                    _set_item(item.replace('area', 'country'), country)
-                if location:
-                    _set_item(item.replace('area', 'location'), location)
-            else:
-                _set_item(item, artist_info[item])
+        if artist_info is None:
+            return
 
-    def _get_artist_info(self, artist_id: str, album: Album) -> None:
+        for key, value in artist_entity_to_key_value_pairs(artist_info):
+            if not value or key == 'id':
+                continue
+
+            # if key in {'area', 'begin-area', 'end-area'}:
+            if key.endswith('area'):
+                country, location = cls._drill_area(value)
+                if country:
+                    _set_item(key.replace('area', 'country'), country)
+                if location:
+                    _set_item(key.replace('area', 'location'), location)
+            else:
+                _set_item(key, value)
+
+    @classmethod
+    def _get_artist_info(cls, artist_id: str, album: Album) -> None:
         """Gets the artist information from the MusicBrainz website.
 
         Args:
             artist_id (str): MBID of the artist to retrieve.
             album (Album): The Album object to use for the processing.
         """
-        self._album_add_request(album)
+        cls._album_add_request(album)
         task_id = f"Artist={artist_id}"
         helper = CustomHelper(album.tagger.webservice)
         handler = partial(
-            self._artist_submission_handler,
+            cls._artist_submission_handler,
             artist=artist_id,
             album=album,
             task_id=task_id,
         )
 
-        return self.api.add_album_task(
+        return SharedVars.api.add_album_task(
             album=album,
             task_id=task_id,
             description=f"Get info for artist: {artist_id}",
-            timeout=10.,
+            timeout=10.0,
             request_factory=lambda: helper.get_artist_by_id(artist_id, handler),
             blocking=True,
         )
 
-    def _artist_submission_handler(self, document, _reply, error, artist=None, album=None, task_id=None) -> None:
-        """Handles the response from the webservice requests for artist information.
-        """
+    @classmethod
+    def _artist_submission_handler(cls, document, _reply, error, artist=None, album=None, task_id=None) -> None:
+        """Handles the response from the webservice requests for artist information."""
+        if error:
+            SharedVars.api.logger.error("Artist '%s' information retrieval error: %s", artist, error)
+
+            # Release task from counter on unrecoverable error.
+            SharedVars.api.complete_album_task(album=album, task_id=task_id)
+            cls._album_remove_request(album)
+
+            return
+
+        artist_info = artist_dict_to_entity(artist, document)
+
+        if artist_info is None:
+            raise ValueError("Invalid information")
+
+        for item in [artist_info.area, artist_info.begin_area, artist_info.end_area]:
+            if item:
+                cls._queue_ancestors(item, album)
+
         try:
-            if error:
-                self.api.logger.error("Artist '%s' information retrieval error.", artist)
-                return
-
-            artist_info = {}
-            for item in ['type', 'gender', 'name', 'sort-name', 'disambiguation']:
-                if item in document and document[item]:
-                    artist_info[item] = document[item]
-
-            if 'life-span' in document:
-                for item in ['begin', 'end']:
-                    if item in document['life-span'] and document['life-span'][item]:
-                        artist_info[item] = document['life-span'][item]
-
-            for item in ['area', 'begin-area', 'end-area']:
-                if item in document and document[item] and 'id' in document[item] and document[item]['id']:
-                    area_id = document[item]['id']
-                    artist_info[item] = area_id
-                    self._queue_ancestors(area_id, album)
-
-            DataCache.set_artist_info(artist_id=artist, artist_info=artist_info)
+            DatabaseUtils.set_artist(artist_info)
+            DataCache.set_artist_info(artist_info)
 
         except Exception as ex:
-            self.api.logger.error("Error processing artist '%s' information: %s", artist, ex)
+            SharedVars.api.logger.error("Error processing artist '%s' information: %s", artist, ex)
 
         finally:
-            self.api.complete_album_task(album=album, task_id=task_id)
-            self._album_remove_request(album)
+            SharedVars.api.complete_album_task(album=album, task_id=task_id)
+            cls._album_remove_request(album)
 
-    def _queue_ancestors(self, area_id: str, album: Album) -> None:
+    @classmethod
+    def _queue_ancestors(cls, area_id: str, album: Album) -> None:
         """Queues the ancestor areas for processing.
 
         Args:
@@ -751,19 +598,20 @@ class ArtistDetailsPlugin:
                 # No area ID to process.  Break out of the loop.
                 break
 
-            if area_id in self.cache_requests['area']:
+            if area_id in cls.cache_requests['area']:
                 # Area ID already queued for processing.  Break out of the loop.
                 break
 
-            if area_id not in DataCache.cache['area']:
+            area_info = DataCache.get_area_info(area_id)
+            if area_info is None:
                 # Area ID not in the cache.  Queue it for processing and break out of the loop.
-                self._get_area_info(area_id, album)
+                cls._get_area_info(area_id, album)
                 break
 
-            area_info = DataCache.get_area_info(area_id)
             area_id = area_info.parent
 
-    def _get_area_info(self, area_id: str, album: Album) -> None:
+    @classmethod
+    def _get_area_info(cls, area_id: str, album: Album) -> None:
         """Gets the area information from the MusicBrainz website.
 
         Args:
@@ -771,84 +619,99 @@ class ArtistDetailsPlugin:
             album (Album): The Album object to use for the processing.
         """
         task_id = f"Area={area_id}"
-        self.cache_requests['area'].add(area_id)
-        self._album_add_request(album)
-        self._add_album_area_request(album.id, area_id)
-        self.api.logger.debug('Retrieving area ID %s from MusicBrainz.', area_id)
+        cls.cache_requests['area'].add(area_id)
+        cls._album_add_request(album)
+        cls._add_album_area_request(album.id, area_id)
+        SharedVars.api.logger.debug('Retrieving area ID %s from MusicBrainz.', area_id)
         helper = CustomHelper(album.tagger.webservice)
         handler = partial(
-            self._area_submission_handler,
+            cls._area_submission_handler,
             area=area_id,
             album=album,
             task_id=task_id,
         )
 
-        return self.api.add_album_task(
+        return SharedVars.api.add_album_task(
             album=album,
             task_id=task_id,
             description=f"Get info for area: {area_id}",
-            timeout=10.,
+            timeout=10.0,
             request_factory=lambda: helper.get_area_by_id(area_id, handler),
             blocking=True,
         )
 
-    def _area_submission_handler(self, document, _reply, error, area=None, album=None, task_id=None) -> None:
-        """Handles the response from the webservice requests for area information.
-        """
+    @classmethod
+    def _area_submission_handler(cls, document, _reply, error, area=None, album=None, task_id=None) -> None:
+        """Handles the response from the webservice requests for area information."""
+        if error:
+            SharedVars.api.logger.error("Area '%s' information retrieval error.", area)
+
+            # Release task from counter on unrecoverable error.
+            SharedVars.api.complete_album_task(album=album, task_id=task_id)
+            cls._remove_album_area_request(album.id, area)
+            cls._album_remove_request(album)
+
+            return
+
+        info = cls._parse_area(document)
+        new_id = info.get('id', '')
+        area_info = area_dict_to_entity(new_id, info)
+
+        if not info or not new_id or area_info is None:
+            SharedVars.api.logger.error("Area '%s' information invalid.", area)
+
+            # Release task from counter on unrecoverable error.
+            SharedVars.api.complete_album_task(album=album, task_id=task_id)
+            cls._remove_album_area_request(album.id, area)
+            cls._album_remove_request(album)
+
+            return
+
+        parent_id = '' if info['type'] == AreaType.COUNTRY.mbid else cls._get_area_parent(document)
+        area_info.parent = parent_id
+
+        cls._area_logger(
+            area_id=new_id,
+            area_name=area_info.name,
+            area_type=AreaType.titles.get(area_info.type, 'Unknown'),
+        )
+
         try:
-            if error:
-                self.api.logger.error("Area '%s' information retrieval error.", area)
-                return
-
-            info = self._parse_area(document)
-            new_id = info.get('id', '')
-            if not info or not new_id:
-                self.api.logger.error("Area '%s' information invalid.", area)
-                return
-
-            parent_id = '' if info['type'] == AREA_TYPE_COUNTRY else self._get_area_parent(document)
-            area_info = Area(
-                parent=parent_id,
-                name=info['name'],
-                country=info['country'],
-                area_type=info['type'],
-                type_text=info['type_text'],
-            )
-            self._area_logger(
-                area_id=new_id,
-                area_name=info['name'],
-                area_type=info['type_text'],
-            )
-            DataCache.set_area_info(area_id=new_id, area_info=area_info)
+            DatabaseUtils.set_area(area_info)
+            DataCache.set_area_info(area_info)
 
             for rel in document.get('relations', []):
-                area_rel = self._parse_area_forward_relationship(rel)
-                if not area_rel.id:
+                area_rel = cls._parse_area_forward_relationship(rel)
+                if area_rel is None or not is_valid_mbid(area_rel.id):
                     continue
-                area_info = Area(
-                    parent=new_id,
+
+                area_info = AreaEntity(
+                    mbid=area_rel.id,
                     name=area_rel.name,
+                    type=area_rel.type,
+                    parent=new_id,
                     country='',
-                    area_type=area_rel.type,
-                    type_text=area_rel.type_text,
                 )
-                self._area_logger(
-                    area_id=area_rel.id,
-                    area_name=area_rel.name,
-                    area_type=area_rel.type_text,
+
+                cls._area_logger(
+                    area_id=area_info.mbid,
+                    area_name=area_info.name,
+                    area_type=AreaType.titles.get(area_info.type, 'Unknown'),
                 )
-                DataCache.set_area_info(area_id=area_rel.id, area_info=area_info)
+
+                DatabaseUtils.set_area(area_info)
+                DataCache.set_area_info(area_info)
 
             # Set up requests for missing ancestors as required
-            self._queue_ancestors(parent_id, album)
+            cls._queue_ancestors(parent_id, album)
 
         except Exception as ex:
-            self.api.logger.error("Error processing area '%s' information: %s", area, ex)
+            SharedVars.api.logger.error("Error processing area '%s' information: %s", area, ex)
 
         finally:
-            self.api.complete_album_task(album=album, task_id=task_id)
-            self._remove_album_area_request(album.id, area)
-            self._album_remove_request(album)
+            SharedVars.api.complete_album_task(album=album, task_id=task_id)
+            cls._remove_album_area_request(album.id, area)
+            cls._album_remove_request(album)
 
     @staticmethod
     def _get_area_parent(document: dict) -> str:
@@ -863,13 +726,18 @@ class ArtistDetailsPlugin:
         parent = ''
         relations = document.get('relations', [])
         for rel in relations:
-            if rel.get('type-id') == RELATIONSHIP_TYPE_PART_OF and rel.get('direction') == 'backward' and not rel.get('ended', False):
+            if (
+                rel.get('type-id', '') == RELATIONSHIP_TYPE_PART_OF
+                and rel.get('direction', '') == 'backward'
+                and not rel.get('ended', False)
+            ):
                 parent = rel.get('area', {}).get('id', '')
                 if parent:
                     break
         return parent
 
-    def _area_logger(self, area_id: str, area_name: str, area_type: str) -> None:
+    @classmethod
+    def _area_logger(cls, area_id: str, area_name: str, area_type: str) -> None:
         """Adds a log entry for the area retrieved.
 
         Args:
@@ -877,24 +745,25 @@ class ArtistDetailsPlugin:
             area_name (str): Name of the area added.
             area_type (str): Type of area added.
         """
-        self._debug_logger(f"Adding area: {area_id} => \"{area_name}\" of type '{area_type}'")
+        cls._debug_logger(f"Adding area: {area_id} => \"{area_name}\" of type '{area_type}'")
 
-    def _parse_area_forward_relationship(self, area_relation: dict) -> AreaRelationship:
+    @classmethod
+    def _parse_area_forward_relationship(cls, area_relation: dict) -> AreaRelationship | None:
         """Parse an area relation to extract the forward area relationship information.
 
         Args:
             area_relation (dict): Dictionary of the area relationship.
 
         Returns:
-            AreaRelationship: Area relationship information.
+            AreaRelationship: Area relationship information or None if invalid relationship.
         """
         rel_type = area_relation.get('type-id', '')
         rel_direction = area_relation.get('direction', '')
         if rel_type != RELATIONSHIP_TYPE_PART_OF or rel_direction != 'forward':
-            return AreaRelationship()
-        area_info = self._parse_area(area_relation.get('area', {}))
-        if not area_info or not area_info.get('id'):
-            return AreaRelationship()
+            return None
+        area_info = cls._parse_area(area_relation.get('area', {}))
+        if not area_info or not area_info.get('id', ''):
+            return None
         return AreaRelationship(
             id=area_info.get('id', ''),
             name=area_info.get('name', ''),
@@ -922,21 +791,16 @@ class ArtistDetailsPlugin:
         area_type_text = area_info.get('type', 'Unknown Area Type')
         country = ''
 
-        if area_type == AREA_TYPE_COUNTRY:
+        if area_type == AreaType.COUNTRY.mbid:
             if ISO_CODES_1 in area_info and area_info[ISO_CODES_1]:
                 country = area_info[ISO_CODES_1][0]
             elif ISO_CODES_2 in area_info and area_info[ISO_CODES_2]:
                 country = area_info[ISO_CODES_2][0][:2]
 
-        return {
-            'id': area_id,
-            'name': area_name,
-            'country': country,
-            'type': area_type,
-            'type_text': area_type_text
-        }
+        return {'id': area_id, 'name': area_name, 'country': country, 'type': area_type, 'type_text': area_type_text}
 
-    def _metadata_error(self, album_id: str, metadata_element: str, metadata_group: str) -> None:
+    @classmethod
+    def _metadata_error(cls, album_id: str, metadata_element: str, metadata_group: str) -> None:
         """Logs metadata-related errors.
 
         Args:
@@ -944,9 +808,12 @@ class ArtistDetailsPlugin:
             metadata_element (str): Metadata element initiating the error.
             metadata_group (str): Metadata group initiating the error.
         """
-        self.api.logger.error("Album '%s' missing '%s' in %s metadata.", album_id, metadata_element, metadata_group)
+        SharedVars.api.logger.error(
+            "Album '%s' missing '%s' in %s metadata.", album_id, metadata_element, metadata_group
+        )
 
-    def _drill_area(self, area_id: str) -> tuple[str, str]:
+    @classmethod
+    def _drill_area(cls, area_id: str) -> tuple[str, str]:
         """Drills up from the specified area to determine the two-character
         country code and the full location description for the area.
 
@@ -958,51 +825,168 @@ class ArtistDetailsPlugin:
         """
         country = ''
         location = []
-        i = 7   # Counter to avoid potential runaway processing
+        i = 7  # Counter to avoid potential runaway processing
 
         while i and area_id and not country:
             i -= 1
             area = DataCache.get_area_info(area_id)
+
+            if area is None:
+                continue
+
             country = area.country
             area_id = area.parent
 
-            if not area.name:
-                continue
-
-            if not location or area.area_type not in CONDITIONAL_LOCATIONS:
+            if not location or area.type not in AreaType.conditional_mbids:
                 location.append(area.name)
             else:
                 if (
-                    (area.area_type == AREA_TYPE_COUNTY and self.api.plugin_config[OPT_AREA_COUNTY])
-                    or (area.area_type == AREA_TYPE_MUNICIPALITY and self.api.plugin_config[OPT_AREA_MUNICIPALITY])
-                    or (area.area_type == AREA_TYPE_SUBDIVISION and self.api.plugin_config[OPT_AREA_SUBDIVISION])
+                    (area.type == AreaType.COUNTY.mbid and SharedVars.api.plugin_config[OPT_AREA_COUNTY])
+                    or (area.type == AreaType.MUNICIPALITY.mbid and SharedVars.api.plugin_config[OPT_AREA_MUNICIPALITY])
+                    or (area.type == AreaType.SUBDIVISION.mbid and SharedVars.api.plugin_config[OPT_AREA_SUBDIVISION])
                 ):
                     location.append(area.name)
 
         return country, ', '.join(location)
 
+    @classmethod
+    def process_orphan_areas(cls) -> None:
+        """Retrieve missing area parents in the background."""
+        text = "Background processing halted."
+        if not SharedVars.use_persistent_cache:
+            SharedVars.api.logger.debug("Persistent cache disabled. " + text)
+            SharedVars.background_processing_running = False
+            return
+
+        if not SharedVars.background_processing_enabled:
+            SharedVars.api.logger.debug("Background processing disabled. " + text)
+            SharedVars.background_processing_running = False
+            return
+
+        if DatabaseUtils.get_orphan_areas_count()[0] < 1:
+            SharedVars.api.logger.debug("No orphan area records found. " + text)
+            SharedVars.background_processing_running = False
+            return
+
+        SharedVars.background_processing_running = True
+        for area in DatabaseUtils.get_missing_parent_areas():
+            QTimer.singleShot(
+                SharedVars.background_processing_interval * 1000,
+                partial(cls._get_single_area_info, area_id=area),
+            )
+            # Only queue one item at a time.
+            break
+
+    @classmethod
+    def _get_single_area_info(cls, area_id: str) -> None:
+        """Gets the area information from the MusicBrainz website for a single area.
+
+        Args:
+            area_id (str): MBID of the area to retrieve.
+        """
+        helper = CustomHelper(SharedVars.api.tagger.webservice)
+        SharedVars.api.logger.debug('Retrieving area ID %s from MusicBrainz as a background task.', area_id)
+        handler = partial(
+            cls._single_area_submission_handler,
+            area=area_id,
+        )
+        helper.get_area_by_id(area_id, handler)
+
+    @classmethod
+    def _single_area_submission_handler(cls, document, _reply, error, area=None) -> None:
+        if error:
+            SharedVars.api.logger.error("Area '%s' information retrieval error.  Background processing halted.", area)
+            SharedVars.background_processing_running = False
+            return
+
+        SharedVars.api.logger.debug('Retrieved area ID %s from MusicBrainz.', area)
+
+        info = cls._parse_area(document)
+        new_id = info.get('id', '')
+        area_info = area_dict_to_entity(new_id, info)
+
+        if not info or not new_id or new_id != area or area_info is None:
+            SharedVars.api.logger.error("Area '%s' information invalid.  Background processing halted.", area)
+            SharedVars.background_processing_running = False
+            return
+
+        parent_id = '' if info['type'] == AreaType.COUNTRY.mbid else cls._get_area_parent(document)
+        area_info.parent = parent_id
+
+        cls._area_logger(
+            area_id=new_id,
+            area_name=area_info.name,
+            area_type=AreaType.titles.get(area_info.type, 'Unknown'),
+        )
+
+        try:
+            DatabaseUtils.set_area(area_info)
+            DataCache.set_area_info(area_info)
+
+            for rel in document.get('relations', []):
+                area_rel = cls._parse_area_forward_relationship(rel)
+                if area_rel is None or not is_valid_mbid(area_rel.id):
+                    continue
+
+                area_info = AreaEntity(
+                    mbid=area_rel.id,
+                    name=area_rel.name,
+                    type=area_rel.type,
+                    parent=new_id,
+                    country='',
+                )
+
+                cls._area_logger(
+                    area_id=area_info.mbid,
+                    area_name=area_info.name,
+                    area_type=AreaType.titles.get(area_info.type, 'Unknown'),
+                )
+
+                DatabaseUtils.set_area(area_info)
+                DataCache.set_area_info(area_info)
+
+        except Exception as ex:
+            SharedVars.api.logger.error("Error processing area '%s' information: %s", area, ex)
+            return
+
+        # Set up requests for missing ancestors as required
+        cls.process_orphan_areas()
+
 
 class AdditionalArtistsDetailsOptionsPage(OptionsPage):
-    """Options page for the Additional Artists Details plugin.
-    """
+    """Options page for the Additional Artists Details plugin."""
 
     TITLE = t_("ui.title", "Additional Artists Details")
     HELP_URL = USER_GUIDE_URL
 
+    _DELETE_CONFIRMATION_MSG_TITLE = t_('ui.delete.confirmation.title', "Confirm Database Deletion")
+    _DELETE_CONFIRMATION_MSG_TEXT = t_(
+        key='ui.delete.confirmation.message',
+        text=(
+            "You are about to delete the local persistent cache database file from your system. "
+            "There is no way to undo this action.  Continue?"
+        ),
+    )
+    _DELETE_SUCCESS_TEXT = t_(
+        key='ui.delete.success.message',
+        text="The persistent cache database file has been successfully deleted.",
+    )
+    _DELETE_RESULT_TITLE = t_('ui.delete.result.title', "Delete Database")
+    _DELETE_ERROR_TEXT = t_(
+        key='ui.delete.error.message',
+        text="There was a problem deleting the persistent cache database file.\n\nError: %s",
+    )
     _ERR_MSG_TITLE = t_('ui.error.cache_title', "Cache Error")
-    _ERR_MSG_CACHE_LOAD = t_('ui.error.cache_load', "Error loading the cache file.\n\n%s")
-    _ERR_MSG_CACHE_SAVE = t_('ui.error.cache_save', "Error saving the cache file.\n\n%s")
     _ERR_MSG_CACHE_IMPORT = t_('ui.error.cache_import', "Error importing the cache file.\nFile: %s\n\n%s")
     _ERR_MSG_CACHE_EXPORT = t_('ui.error.cache_export', "Error exporting the cache file.\nFile: %s\n\n%s")
-    _SUCCESS_LOAD = t_('ui.success.load', "Successfully reloaded the cache file.")
-    _SUCCESS_SAVE = t_('ui.success.save', "Successfully updated the cache file.")
     _SUCCESS_IMPORT = t_('ui.success.import', "Successfully imported the cache file.\nFile: %s")
     _SUCCESS_EXPORT = t_('ui.success.export', "Successfully exported the cache file.\nFile: %s")
     _FILTER_ALL = t_('ui.filter.all', "All files")
+    _FILTER_CSV = t_('ui.filter.csv', "CSV files")
     _FILTER_JSON = t_('ui.filter.json', "JSON files")
 
     def __init__(self, parent=None) -> None:
-        super(AdditionalArtistsDetailsOptionsPage, self).__init__(parent)
+        super().__init__(parent)
 
         self.ui = Ui_AdditionalArtistsDetailsOptionsPage()
         self.ui.setupUi(self)
@@ -1012,184 +996,230 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
 
         self.ui.b_open_cache_directory.clicked.connect(self.open_cache_directory)
         self.ui.b_edit_cache.clicked.connect(self.cache_edit)
-        self.ui.b_load_cache.clicked.connect(self.cache_load)
-        self.ui.b_save_cache.clicked.connect(self.cache_save)
         self.ui.b_import_cache.clicked.connect(self.cache_import)
         self.ui.b_export_cache.clicked.connect(self.cache_export)
+        self.ui.b_delete_cache.clicked.connect(self.cache_delete)
+        self.ui.b_cache_status.clicked.connect(self.cache_status)
 
         self.ui.cb_use_cache.stateChanged.connect(self._use_cache_state_changed)
-
-        self.save_artists_changed = False
         self.ui.cb_save_artists.stateChanged.connect(self._save_artists_state_changed)
 
-        self.ui.cache_file.setText(DataCache.cache_file)
+        self.ui.cache_file.setText(DB_FILE)
 
-        self.api = PluginApi.get_api()
-
-        self.filter_all = self.api.tr(self._FILTER_ALL) + " (*)"
-        self.filter_json = self.api.tr(self._FILTER_JSON) + " (*.json)"
+        self.filter_all = SharedVars.api.tr(self._FILTER_ALL) + " (*)"
+        self.filter_csv = SharedVars.api.tr(self._FILTER_CSV) + " (*.csv)"
+        self.filter_json = SharedVars.api.tr(self._FILTER_JSON) + " (*.json)"
 
         self.user_documents_dir = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)
 
     def load(self) -> None:
-        """Load the option settings.
-        """
-        self.ui.cb_process_tracks.setChecked(self.api.plugin_config[OPT_PROCESS_TRACKS])
-        self.ui.cb_area_county.setChecked(self.api.plugin_config[OPT_AREA_COUNTY])
-        self.ui.cb_area_municipality.setChecked(self.api.plugin_config[OPT_AREA_MUNICIPALITY])
-        self.ui.cb_area_subdivision.setChecked(self.api.plugin_config[OPT_AREA_SUBDIVISION])
-        self.ui.cb_use_cache.setChecked(self.api.plugin_config[OPT_USE_CACHE])
-        self.save_artists = self.api.plugin_config[OPT_SAVE_ARTISTS_IN_CACHE]
+        """Load the option settings."""
+        self.ui.cb_process_tracks.setChecked(SharedVars.api.plugin_config[OPT_PROCESS_TRACKS])
+        self.ui.cb_area_county.setChecked(SharedVars.api.plugin_config[OPT_AREA_COUNTY])
+        self.ui.cb_area_municipality.setChecked(SharedVars.api.plugin_config[OPT_AREA_MUNICIPALITY])
+        self.ui.cb_area_subdivision.setChecked(SharedVars.api.plugin_config[OPT_AREA_SUBDIVISION])
+        self.ui.cb_use_cache.setChecked(SharedVars.api.plugin_config[OPT_USE_CACHE])
+        self.save_artists = SharedVars.api.plugin_config[OPT_SAVE_ARTISTS_IN_CACHE]
         self.ui.cb_save_artists.setChecked(self.save_artists)
-        self._set_edit_button_state()
-        self._use_cache_state_changed()
+        self.ui.cb_use_background_processing.setChecked(SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_AREAS])
+        self.ui.background_processing_interval.setValue(SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_INTERVAL])
+        self._set_button_states()
 
     def save(self) -> None:
-        """Save the option settings.
-        """
-        self.api.plugin_config[OPT_PROCESS_TRACKS] = self.ui.cb_process_tracks.isChecked()
-        self.api.plugin_config[OPT_AREA_COUNTY] = self.ui.cb_area_county.isChecked()
-        self.api.plugin_config[OPT_AREA_MUNICIPALITY] = self.ui.cb_area_municipality.isChecked()
-        self.api.plugin_config[OPT_AREA_SUBDIVISION] = self.ui.cb_area_subdivision.isChecked()
-        self.api.plugin_config[OPT_USE_CACHE] = self.ui.cb_use_cache.isChecked()
-        DataCache.save_artists = self.ui.cb_save_artists.isChecked()
-        self.api.plugin_config[OPT_SAVE_ARTISTS_IN_CACHE] = DataCache.save_artists
-        if DataCache.save_artists != self.save_artists:
-            DataCache.is_dirty = True
-        self.save_artists = DataCache.save_artists
+        """Save the option settings."""
+        SharedVars.api.plugin_config[OPT_PROCESS_TRACKS] = self.ui.cb_process_tracks.isChecked()
+        SharedVars.api.plugin_config[OPT_AREA_COUNTY] = self.ui.cb_area_county.isChecked()
+        SharedVars.api.plugin_config[OPT_AREA_MUNICIPALITY] = self.ui.cb_area_municipality.isChecked()
+        SharedVars.api.plugin_config[OPT_AREA_SUBDIVISION] = self.ui.cb_area_subdivision.isChecked()
+        SharedVars.use_persistent_cache = self.ui.cb_use_cache.isChecked()
+        SharedVars.api.plugin_config[OPT_USE_CACHE] = SharedVars.use_persistent_cache
+        SharedVars.save_artists = self.ui.cb_save_artists.isChecked()
+        SharedVars.api.plugin_config[OPT_SAVE_ARTISTS_IN_CACHE] = SharedVars.save_artists
+        self.save_artists = SharedVars.save_artists
+        SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_AREAS] = self.ui.cb_use_background_processing.isChecked()
+        SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_INTERVAL] = self.ui.background_processing_interval.value()
+        if SharedVars.use_persistent_cache:
+            initialize_cache_db()
 
     def _save_artists_state_changed(self) -> None:
-        self.save_artists_changed = True
-        self._set_edit_button_state()
+        self._set_button_states()
 
     def _use_cache_state_changed(self) -> None:
+        self._set_button_states()
+
+    def _set_button_states(self) -> None:
+        cache_exists = os.path.isfile(DB_FILE)
         enabled = self.ui.cb_use_cache.isChecked()
-        self.ui.b_load_cache.setEnabled(enabled)
-        self.ui.b_save_cache.setEnabled(enabled)
 
-    def _set_edit_button_state(self) -> None:
-        self.ui.b_edit_cache.setEnabled(self.ui.cb_save_artists.isChecked())
-
-    def cache_load(self) -> None:
-        """Load the cache file.
-        """
-        saved_state = DataCache.use_persistent_cache
-        DataCache.use_persistent_cache = True
-
-        try:
-            DataCache.load_cache()
-            QtWidgets.QMessageBox.information(
-                self,
-                None,
-                self.api.tr(self._SUCCESS_LOAD),
-            )
-        except CacheException as ex:
-            self.api.logger.error(str(ex))
-            QtWidgets.QMessageBox.critical(
-                self,
-                self.api.tr(self._ERR_MSG_TITLE),
-                self.api.tr(self._ERR_MSG_CACHE_LOAD) % (ex,),
-            )
-
-        DataCache.use_persistent_cache = saved_state
-
-    def cache_save(self) -> None:
-        """Save the cache file.
-        """
-        saved_state = DataCache.use_persistent_cache
-        DataCache.use_persistent_cache = True
-
-        if self.save_artists_changed:
-            DataCache.is_dirty = True
-            self.save_artists_changed = False
-
-        save_artists = self.ui.cb_save_artists.isChecked()
-        if save_artists != DataCache.save_artists:
-            DataCache.is_dirty = True
-
-        try:
-            DataCache.save_cache(save_artists=save_artists)
-            QtWidgets.QMessageBox.information(
-                self,
-                None,
-                self.api.tr(self._SUCCESS_SAVE),
-            )
-        except CacheException as ex:
-            self.api.logger.error(str(ex))
-            QtWidgets.QMessageBox.critical(
-                self,
-                self.api.tr(self._ERR_MSG_TITLE),
-                self.api.tr(self._ERR_MSG_CACHE_SAVE) % (ex,),
-            )
-
-        DataCache.use_persistent_cache = saved_state
+        self.ui.b_edit_cache.setEnabled(cache_exists and enabled and self.ui.cb_save_artists.isChecked())
+        self.ui.b_import_cache.setEnabled(cache_exists and enabled)
+        self.ui.b_export_cache.setEnabled(cache_exists and enabled)
+        self.ui.b_delete_cache.setEnabled(cache_exists and not enabled)
 
     def cache_import(self) -> None:
-        """Import from a cache file.
-        """
-        filepath, _filter = FileDialog.getOpenFileName(
+        """Import from a cache file."""
+        filepath, filter = FileDialog.getOpenFileName(
             parent=self,
-            directory=self.user_documents_dir,
-            filter=self.filter_json + ";;" + self.filter_all,
-            initialFilter=self.filter_json,
+            directory=DEF_DIR,
+            # filter=self.filter_csv + ";;" + self.filter_json + ";;" + self.filter_all,
+            filter=self.filter_csv + ";;" + self.filter_json,
+            initialFilter=self.filter_csv,
         )
+
         if not filepath:
             return
 
+        if filter == self.filter_json:
+            importer = DatabaseUtils.import_from_json
+        else:
+            importer = DatabaseUtils.import_from_csv
+
         try:
-            DataCache.import_cache(filename=filepath)
-            QtWidgets.QMessageBox.information(
-                self,
-                None,
-                self.api.tr(self._SUCCESS_IMPORT) % (filepath,)
-            )
-        except CacheException as ex:
-            self.api.logger.error(str(ex))
+            importer(filename=filepath, save_artists=self.ui.cb_save_artists.isChecked())
+            QtWidgets.QMessageBox.information(self, None, SharedVars.api.tr(self._SUCCESS_IMPORT) % (filepath,))
+        except Exception as ex:
+            SharedVars.api.logger.error(str(ex))
             QtWidgets.QMessageBox.critical(
                 self,
-                self.api.tr(self._ERR_MSG_TITLE),
-                self.api.tr(self._ERR_MSG_CACHE_SAVE) % (filepath, ex,),
+                SharedVars.api.tr(self._ERR_MSG_TITLE),
+                SharedVars.api.tr(self._ERR_MSG_CACHE_IMPORT)
+                % (
+                    filepath,
+                    ex,
+                ),
             )
 
     def cache_export(self) -> None:
-        """Export to a cache file.
-        """
+        """Export to a cache file."""
         filepath, _filter = FileDialog.getSaveFileName(
             parent=self,
-            directory=os.path.join(self.user_documents_dir, 'additional_artists_details_cache.json'),
-            filter=self.filter_json + ";;" + self.filter_all,
-            initialFilter=self.filter_json,
+            directory=os.path.join(DEF_DIR, BASE_FILENAME + '.csv'),
+            # filter=self.filter_csv + ";;" + self.filter_all,
+            filter=self.filter_csv,
+            initialFilter=self.filter_csv,
         )
         if not filepath:
             return
 
-        save_artists = self.ui.cb_save_artists.isChecked()
         try:
-            DataCache.export_cache(filename=filepath, save_artists=save_artists)
-            QtWidgets.QMessageBox.information(
-                self,
-                None,
-                self.api.tr(self._SUCCESS_EXPORT) % (filepath,)
-            )
-        except CacheException as ex:
-            self.api.logger.error(str(ex))
+            DatabaseUtils.export_to_csv(filename=filepath, save_artists=self.ui.cb_save_artists.isChecked())
+            QtWidgets.QMessageBox.information(self, None, SharedVars.api.tr(self._SUCCESS_EXPORT) % (filepath,))
+        except Exception as ex:
+            SharedVars.api.logger.error(str(ex))
             QtWidgets.QMessageBox.critical(
                 self,
-                self.api.tr(self._ERR_MSG_TITLE),
-                self.api.tr(self._ERR_MSG_CACHE_SAVE) % (filepath, ex,),
+                SharedVars.api.tr(self._ERR_MSG_TITLE),
+                SharedVars.api.tr(self._ERR_MSG_CACHE_EXPORT)
+                % (
+                    filepath,
+                    ex,
+                ),
             )
 
     def cache_edit(self) -> None:
-        """Edit the cache and file.
-        """
+        """Edit the artists retained in the session cache and database file."""
         editor = CacheEditorPage(self)
         editor.exec()
 
+    def cache_status(self) -> None:
+        """Display the status of the session cache and database file."""
+        page = CacheStatusPage(self)
+        page.exec()
+
+    def cache_delete(self) -> bool:
+        if (
+            QtWidgets.QMessageBox.warning(
+                self,
+                SharedVars.api.tr(self._DELETE_CONFIRMATION_MSG_TITLE),
+                SharedVars.api.tr(self._DELETE_CONFIRMATION_MSG_TEXT),
+                QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel,
+                QtWidgets.QMessageBox.StandardButton.Cancel,
+            )
+            == QtWidgets.QMessageBox.StandardButton.Cancel
+        ):
+            return False
+
+        try:
+            os.remove(DB_FILE)
+
+            QtWidgets.QMessageBox.information(
+                self,
+                SharedVars.api.tr(self._DELETE_RESULT_TITLE),
+                SharedVars.api.tr(self._DELETE_SUCCESS_TEXT),
+            )
+
+        except OSError as e:
+            QtWidgets.QMessageBox.critical(
+                self,
+                SharedVars.api.tr(self._DELETE_RESULT_TITLE),
+                SharedVars.api.tr(self._DELETE_ERROR_TEXT) % e,
+            )
+            return False
+
+        finally:
+            self._set_button_states()
+
+        return True
+
     def open_cache_directory(self) -> None:
-        """Open the persistent cache file directory in system file browser.
-        """
-        cache_dir = DataCache.cache_dir
-        open_local_path(cache_dir)
+        """Open the persistent cache file directory in system file browser."""
+        open_local_path(DB_DIR)
+
+
+class CacheStatusPage(PicardDialog):
+    """Cache Status Dialog"""
+
+    _CACHE_MISSING_TEXT = t_(
+        key='ui.not_found.message',
+        text="Note: The cache database was not found.",
+    )
+
+    _ORPHANS_MSG_TEXT = t_(
+        key='ui.orphans.message', text="There are orphan area records. Missing parents: %s, Orphan areas: %s"
+    )
+
+    _NO_ORPHANS_MSG_TEXT = t_(key='ui.no_orphans.message', text="There are no orphan area records.")
+
+    _BACKGROUND_RUNNING_MSG_TEXT = t_(
+        key='ui.background_running.message', text="Background processing is currently running."
+    )
+
+    _BACKGROUND_NOT_RUNNING_MSG_TEXT = t_(
+        key='ui.background_not_running.message', text="Background processing is currently not running."
+    )
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+
+        self.ui = Ui_AdditionalArtistsDetailsCacheStatus()
+        self.ui.setupUi(self)
+
+        self.ui.buttonBox.accepted.connect(self.close)
+        self.ui.buttonBox.rejected.connect(self.close)
+
+        # Set database cache counts in display
+        if os.path.exists(DB_FILE) and os.path.isfile(DB_FILE):
+            (artist, area) = DatabaseUtils.get_counts()
+            parents, children = DatabaseUtils.get_orphan_areas_count()
+            if parents > 0:
+                text = SharedVars.api.tr(self._ORPHANS_MSG_TEXT) % (parents, children)
+                if SharedVars.background_processing_running:
+                    text += '\n' + SharedVars.api.tr(self._BACKGROUND_RUNNING_MSG_TEXT)
+                else:
+                    text += '\n' + SharedVars.api.tr(self._BACKGROUND_NOT_RUNNING_MSG_TEXT)
+                self.ui.status_note.setText(text)
+            else:
+                self.ui.status_note.setText(SharedVars.api.tr(self._NO_ORPHANS_MSG_TEXT))
+        else:
+            self.ui.status_note.setText(SharedVars.api.tr(self._CACHE_MISSING_TEXT))
+            (artist, area) = (None, None)
+
+        self.ui.database_artists_count.setText('n/a' if artist is None else f"{artist:,}")
+        self.ui.database_areas_count.setText('n/a' if area is None else f"{area:,}")
+
+        # Set session cache counts in display
+        self.ui.session_artists_count.setText(f"{len(DataCache.artist_cache):,}")
+        self.ui.session_areas_count.setText(f"{len(DataCache.area_cache):,}")
 
 
 class CacheEditorPage(PicardDialog):
@@ -1204,16 +1234,18 @@ class CacheEditorPage(PicardDialog):
     _SUCCESS_MSG_TITLE = t_('ui.remove.success.title', "Artist Removal Success")
     _SUCCESS_MSG_TEXT = t_(
         key='ui.remove.success.message',
-        text=(
-            "Artist removal from the cache successfully completed.\n\n"
-            "Please save or export the cache to save the changes."
-        ),
+        text="Artist removal from the cache successfully completed.",
     )
     _FILTER_STATUS_UNFILTERED = t_('ui.filter_status.unfiltered', "(unfiltered)")
     _FILTER_STATUS_FILTERED = t_(
         key='ui.filter_status.filtered',
         text="({n} item)",
         plural="({n} items)",
+    )
+    _NO_ARTISTS_TITLE = t_('ui.no_artists.title', "No Artists")
+    _NO_ARTISTS_TEXT = t_(
+        key='ui.no_artists.message',
+        text="There were no artists found in the cache.  The editor will now close.",
     )
 
     def __init__(self, parent=None) -> None:
@@ -1229,11 +1261,6 @@ class CacheEditorPage(PicardDialog):
         self.ui.b_filter_previous.setIcon(icon_up)
         self.ui.b_filter_next.setIcon(icon_dn)
 
-        self.api = PluginApi.get_api()
-
-        self.load_artists()
-        self.update_checked_selector_state()
-
         self.ui.filter_text.setText("")
         self._update_filter_status()
 
@@ -1248,17 +1275,25 @@ class CacheEditorPage(PicardDialog):
         self.ui.b_filter_previous.clicked.connect(self.move_up)
         self.ui.b_filter_next.clicked.connect(self.move_down)
 
+        self.load_artists()
+        self.update_checked_selector_state()
+
+        # Check and display dialog after delay to ensure editor page is visible
+        QTimer.singleShot(10, self._check_if_no_artists)
+
     def load_artists(self) -> None:
-        """Load the list of artists from the cache.
-        """
+        """Load the list of artists from the cache."""
         self.ui.listWidget.clear()
-        artists: dict = deepcopy(DataCache.cache['artist'])
-        for artist_id, artist in sorted(artists.items(), key=lambda x: x[1]['sort-name']):
-            item = QtWidgets.QListWidgetItem(f"{artist['sort-name']} [{artist['type']}]")
+        for artist in DatabaseUtils.get_all_artists():
+            item = QtWidgets.QListWidgetItem(f"{artist.sort} [{artist.type}]")
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(Qt.CheckState.Unchecked)
-            item.setData(Qt.ItemDataRole.UserRole, artist_id)
+            item.setData(Qt.ItemDataRole.UserRole, artist.mbid)
             self.ui.listWidget.addItem(item)
+
+        if self.ui.listWidget.count() < 1:
+            return
+
         self.current_item = self.ui.listWidget.item(0)
 
         # Initialize the normal and bold font definitions
@@ -1269,16 +1304,16 @@ class CacheEditorPage(PicardDialog):
         self._set_up_down_states()
 
     def _update_filter_status(self) -> None:
-        """Display count of filtered items.
-        """
+        """Display count of filtered items."""
         if self.ui.filter_text.text():
-            self.ui.filter_status_label.setText(self.api.trn(*self._FILTER_STATUS_FILTERED, n=len(self.matched_items)))
+            self.ui.filter_status_label.setText(
+                SharedVars.api.trn(*self._FILTER_STATUS_FILTERED, n=len(self.matched_items))
+            )
         else:
-            self.ui.filter_status_label.setText(self.api.tr(self._FILTER_STATUS_UNFILTERED))
+            self.ui.filter_status_label.setText(SharedVars.api.tr(self._FILTER_STATUS_UNFILTERED))
 
     def filter_changed(self) -> None:
-        """Process updated filter string.
-        """
+        """Process updated filter string."""
         if self.ui.filter_text.text():
             self.matched_items = self.ui.listWidget.findItems(self.ui.filter_text.text(), Qt.MatchFlag.MatchContains)
         else:
@@ -1302,8 +1337,7 @@ class CacheEditorPage(PicardDialog):
         self.ui.b_filter_next.setEnabled(len(self.matched_items) > 1)
 
     def move_up(self) -> None:
-        """Move current item to the previous filtered item.
-        """
+        """Move current item to the previous filtered item."""
         current_index = self.ui.listWidget.currentRow()
         new_item = self.ui.listWidget.item(0)
         for item in reversed(self.matched_items):
@@ -1317,8 +1351,7 @@ class CacheEditorPage(PicardDialog):
         self._move_current_item(new_item)
 
     def move_down(self) -> None:
-        """Move current item to the next filtered item.
-        """
+        """Move current item to the next filtered item."""
         current_index = self.ui.listWidget.currentRow()
         new_item = self.ui.listWidget.item(self.ui.listWidget.count() - 1)
         for item in self.matched_items:
@@ -1341,8 +1374,7 @@ class CacheEditorPage(PicardDialog):
         self._set_up_down_states()
 
     def _set_up_down_states(self) -> None:
-        """Set the enabled states for the up and down buttons.
-        """
+        """Set the enabled states for the up and down buttons."""
         if not self.matched_items:
             self.ui.b_filter_previous.setEnabled(False)
             self.ui.b_filter_next.setEnabled(False)
@@ -1354,42 +1386,47 @@ class CacheEditorPage(PicardDialog):
             self.ui.b_filter_next.setEnabled(current_index < last_index)
 
     def list_item_changed(self, _item: QtWidgets.QListWidgetItem) -> None:
-        """Process when the current item has been checked or unchecked.
-        """
+        """Process when the current item has been checked or unchecked."""
         self.update_checked_selector_state()
 
     def remove_artists(self) -> None:
-        """Remove the selected artists from the cache, display a results dialog and exit.
-        """
+        """Remove the selected artists from the cache, display a results dialog and exit."""
         count = self.get_checked_count()
         if count < 1:
             return
 
-        if QtWidgets.QMessageBox.warning(
-            self,
-            self.api.tr(self._CONFIRMATION_MSG_TITLE),
-            self.api.trn(*self._CONFIRMATION_MSG_TEXT, n=count),
-            QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel,
-            QtWidgets.QMessageBox.StandardButton.Cancel,
-        ) == QtWidgets.QMessageBox.StandardButton.Cancel:
+        if (
+            QtWidgets.QMessageBox.warning(
+                self,
+                SharedVars.api.tr(self._CONFIRMATION_MSG_TITLE),
+                SharedVars.api.trn(*self._CONFIRMATION_MSG_TEXT, n=count),
+                QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel,
+                QtWidgets.QMessageBox.StandardButton.Cancel,
+            )
+            == QtWidgets.QMessageBox.StandardButton.Cancel
+        ):
             return
 
+        artists = []
         for index in range(self.ui.listWidget.count()):
             item = self.ui.listWidget.item(index)
             if item.checkState() == Qt.CheckState.Checked:
-                DataCache.remove_artist_info(item.data(Qt.ItemDataRole.UserRole))
+                mbid = item.data(Qt.ItemDataRole.UserRole)
+                DataCache.remove_artist_info(mbid)
+                artists.append(mbid)
+
+        DatabaseUtils.remove_artists(artists)
 
         QtWidgets.QMessageBox.information(
             self,
-            self.api.tr(self._SUCCESS_MSG_TITLE),
-            self.api.tr(self._SUCCESS_MSG_TEXT),
+            SharedVars.api.tr(self._SUCCESS_MSG_TITLE),
+            SharedVars.api.tr(self._SUCCESS_MSG_TEXT),
         )
 
         self.close()
 
     def get_checked_count(self) -> int:
-        """Get the number of checked items in the list.
-        """
+        """Get the number of checked items in the list."""
         count = 0
         for index in range(self.ui.listWidget.count()):
             if self.ui.listWidget.item(index).checkState() == Qt.CheckState.Checked:
@@ -1397,8 +1434,7 @@ class CacheEditorPage(PicardDialog):
         return count
 
     def selector_clicked(self) -> None:
-        """Select or deselect all items when master selector checkbox is clicked.
-        """
+        """Select or deselect all items when master selector checkbox is clicked."""
         total = self.ui.listWidget.count()
         count = self.get_checked_count()
         set_state = Qt.CheckState.Checked if count < total else Qt.CheckState.Unchecked
@@ -1411,8 +1447,7 @@ class CacheEditorPage(PicardDialog):
         self.ui.b_remove.setEnabled(count > 0)
 
     def update_checked_selector_state(self) -> None:
-        """Update the display state of the master selector checkbox.
-        """
+        """Update the display state of the master selector checkbox."""
         total = self.ui.listWidget.count()
         count = self.get_checked_count()
         self.ui.checked_count_label.setText(f"({count:,}/{total:,})")
@@ -1423,6 +1458,48 @@ class CacheEditorPage(PicardDialog):
         else:
             self.ui.cb_select_all.setCheckState(Qt.CheckState.PartiallyChecked)
         self.ui.b_remove.setEnabled(count > 0)
+
+    def _check_if_no_artists(self):
+        if self.ui.listWidget.count() > 0:
+            return
+
+        QtWidgets.QMessageBox.warning(
+            self,
+            SharedVars.api.tr(self._NO_ARTISTS_TITLE),
+            SharedVars.api.tr(self._NO_ARTISTS_TEXT),
+            QtWidgets.QMessageBox.StandardButton.Ok,
+            QtWidgets.QMessageBox.StandardButton.Ok,
+        )
+        self.close()
+
+
+def initialize_cache_db() -> None:
+    """Initialize the cache database for the plugin."""
+    if os.path.exists(DB_FILE):
+        DatabaseUtils.update_database_schema()
+    else:
+        SharedVars.api.logger.info("Creating new database file: %s", DB_FILE)
+        DatabaseUtils.initialize_database()
+        DatabaseUtils.update_database_schema()
+        old_cache_file = os.path.join(DB_DIR, BASE_FILENAME + '.json')
+        if os.path.exists(old_cache_file):
+            SharedVars.api.logger.info("Importing cache file: %s", old_cache_file)
+            DatabaseUtils.import_from_json(old_cache_file, save_artists=SharedVars.save_artists)
+            try:
+                os.remove(old_cache_file)
+                SharedVars.api.logger.info("Removed old cache file: %s", old_cache_file)
+            except OSError as e:
+                SharedVars.api.logger.warning("Error removing old cache file: %s", e)
+
+    ArtistDetailsPlugin.process_orphan_areas()
+
+
+class BackgroundProcessingAction(BaseAction):
+    TITLE = t_("ui.action.background_processing.title", "Start background area retrieval processing")
+
+    def callback(self, objs):
+        SharedVars.api.logger.debug("Background area retrieval processing started.")
+        ArtistDetailsPlugin.process_orphan_areas()
 
 
 def enable(api: PluginApi) -> None:
@@ -1438,11 +1515,18 @@ def enable(api: PluginApi) -> None:
     api.plugin_config.register_option(OPT_AREA_SUBDIVISION, True)
     api.plugin_config.register_option(OPT_USE_CACHE, True)
     api.plugin_config.register_option(OPT_SAVE_ARTISTS_IN_CACHE, True)
+    api.plugin_config.register_option(OPT_BACKGROUND_FETCH_AREAS, False)
+    api.plugin_config.register_option(OPT_BACKGROUND_FETCH_INTERVAL, 60)
 
     # Migrate settings from 2.x version if available
     migrate_settings(api)
 
-    plugin = ArtistDetailsPlugin(api)
+    SharedVars.api = api
+
+    plugin = ArtistDetailsPlugin
+    # plugin.api = api
+    plugin.has_debug_if = hasattr(api.logger, 'debug_if')
+
     api.register_options_page(AdditionalArtistsDetailsOptionsPage)
     api.register_album_post_removal_processor(plugin.remove_album)
 
@@ -1450,28 +1534,25 @@ def enable(api: PluginApi) -> None:
     api.register_album_metadata_processor(plugin.make_album_vars, priority=100)
     api.register_track_metadata_processor(plugin.make_track_vars, priority=100)
 
-    DataCache.use_persistent_cache = api.plugin_config[OPT_USE_CACHE]
-    DataCache.save_artists = api.plugin_config[OPT_SAVE_ARTISTS_IN_CACHE]
+    # Set shared variables for use within various classes and modules
+    SharedVars.use_persistent_cache = api.plugin_config[OPT_USE_CACHE]
+    SharedVars.save_artists = api.plugin_config[OPT_SAVE_ARTISTS_IN_CACHE]
+    SharedVars.background_processing_enabled = api.plugin_config[OPT_BACKGROUND_FETCH_AREAS]
+    SharedVars.background_processing_interval = api.plugin_config[OPT_BACKGROUND_FETCH_INTERVAL]
+    SharedVars.background_processing_running = False
 
-    # Populate cache from file
-    if DataCache.use_persistent_cache:
-        try:
-            DataCache.load_cache()
-        except CacheException as ex:
-            api.logger.error(str(ex))
+    if SharedVars.use_persistent_cache:
+        initialize_cache_db()
     else:
         api.logger.info("Persistent cache is diabled.")
 
+    # Register menu action to start background processing
+    api.register_tools_menu_action(BackgroundProcessingAction)
+
 
 def disable():
-    """Called when plugin is enabled.
-    """
-    # Save the cache to a file
-    try:
-        DataCache.save_cache()
-    except CacheException as ex:
-        api = PluginApi.get_api()
-        api.logger.error(str(ex))
+    """Called when plugin is disabled."""
+    pass
 
 
 def migrate_settings(api: PluginApi) -> None:
@@ -1494,7 +1575,10 @@ def migrate_settings(api: PluginApi) -> None:
 
     for old_key, new_key, qtype in mapping:
         if api.global_config.setting.raw_value(old_key) is None:
-            api.logger.debug("No old setting for key: '%s'", old_key,)
+            api.logger.debug(
+                "No old setting for key: '%s'",
+                old_key,
+            )
             continue
         api.plugin_config[new_key] = api.global_config.setting.raw_value(old_key, qtype=qtype)
         api.global_config.setting.remove(old_key)
