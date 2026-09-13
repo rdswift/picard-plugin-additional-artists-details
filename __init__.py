@@ -1170,22 +1170,26 @@ class CacheStatusPage(PicardDialog):
     """Cache Status Dialog"""
 
     _CACHE_MISSING_TEXT = t_(
-        key='ui.not_found.message',
-        text="Note: The cache database was not found.",
+        key='ui.notes.not_found.message',
+        text="The cache database was not found.",
     )
 
     _ORPHANS_MSG_TEXT = t_(
-        key='ui.orphans.message', text="There are orphan area records. Missing parents: %s, Orphan areas: %s"
+        key='ui.notes.orphans.message', text="There are orphan area records. Missing parents: %s, Orphan areas: %s"
     )
 
-    _NO_ORPHANS_MSG_TEXT = t_(key='ui.no_orphans.message', text="There are no orphan area records.")
+    _NO_ORPHANS_MSG_TEXT = t_(key='ui.notes.no_orphans.message', text="There are no orphan area records.")
+
+    _BACKGROUND_DISABLED_MSG_TEXT = t_(
+        key='ui.notes.background_disabled.message', text="Background processing is currently disabled."
+    )
 
     _BACKGROUND_RUNNING_MSG_TEXT = t_(
-        key='ui.background_running.message', text="Background processing is currently running."
+        key='ui.notes.background_running.message', text="Background processing is enabled and currently running."
     )
 
     _BACKGROUND_NOT_RUNNING_MSG_TEXT = t_(
-        key='ui.background_not_running.message', text="Background processing is currently not running."
+        key='ui.notes.background_not_running.message', text="Background processing is enabled but currently not running."
     )
 
     def __init__(self, parent=None) -> None:
@@ -1197,23 +1201,31 @@ class CacheStatusPage(PicardDialog):
         self.ui.buttonBox.accepted.connect(self.close)
         self.ui.buttonBox.rejected.connect(self.close)
 
-        # Set database cache counts in display
+        # Get database cache counts and set orphans note
         if os.path.exists(DB_FILE) and os.path.isfile(DB_FILE):
             (artist, area) = DatabaseUtils.get_counts()
             parents, children = DatabaseUtils.get_orphan_areas_count()
             if parents > 0:
-                text = SharedVars.api.tr(self._ORPHANS_MSG_TEXT) % (parents, children)
-                if SharedVars.background_processing_running:
-                    text += '\n' + SharedVars.api.tr(self._BACKGROUND_RUNNING_MSG_TEXT)
-                else:
-                    text += '\n' + SharedVars.api.tr(self._BACKGROUND_NOT_RUNNING_MSG_TEXT)
-                self.ui.status_note.setText(text)
+                notes = SharedVars.api.tr(self._ORPHANS_MSG_TEXT) % (parents, children)
             else:
-                self.ui.status_note.setText(SharedVars.api.tr(self._NO_ORPHANS_MSG_TEXT))
+                notes = SharedVars.api.tr(self._NO_ORPHANS_MSG_TEXT)
         else:
-            self.ui.status_note.setText(SharedVars.api.tr(self._CACHE_MISSING_TEXT))
+            notes = SharedVars.api.tr(self._CACHE_MISSING_TEXT)
             (artist, area) = (None, None)
 
+        # Set note regarding background processing
+        if SharedVars.background_processing_enabled:
+            if SharedVars.background_processing_running:
+                notes += '\n' + SharedVars.api.tr(self._BACKGROUND_RUNNING_MSG_TEXT)
+            else:
+                notes += '\n' + SharedVars.api.tr(self._BACKGROUND_NOT_RUNNING_MSG_TEXT)
+        else:
+            notes += '\n' + SharedVars.api.tr(self._BACKGROUND_DISABLED_MSG_TEXT)
+
+        # Set database cache notes in display
+        self.ui.status_note.setText(notes)
+
+        # Set database cache counts in display
         self.ui.database_artists_count.setText('n/a' if artist is None else f"{artist:,}")
         self.ui.database_areas_count.setText('n/a' if area is None else f"{area:,}")
 
@@ -1495,7 +1507,10 @@ def initialize_cache_db() -> None:
 
 
 class BackgroundProcessingAction(BaseAction):
-    TITLE = t_("ui.action.background_processing.title", "Start background area retrieval processing")
+    # TODO: Find a way to allow the menu items to be translated.
+    # _menu_title = t_("ui.action.sub_menu.title", "Additional Artists Details")
+    MENU = ("Additional Artists Details",)
+    TITLE = t_("ui.action.background_processing.title", "Start background processing")
 
     def callback(self, objs):
         SharedVars.api.logger.debug("Background area retrieval processing started.")
