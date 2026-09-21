@@ -36,7 +36,6 @@ from picard.plugin3.api import (
     OptionsPage,
     PluginApi,
     Track,
-    t_,
 )
 
 from picard.ui import PicardDialog
@@ -69,8 +68,10 @@ from .misc_utils import (
     area_dict_to_entity,
     artist_dict_to_entity,
     artist_entity_to_key_value_pairs,
+    format_bytes,
     is_valid_mbid,
 )
+from .translations import TxStrings
 from .ui_artists_cache_editor import Ui_AdditionalArtistsDetailsCacheEditor
 from .ui_cache_status import Ui_AdditionalArtistsDetailsCacheStatus
 from .ui_options_additional_artists_details import Ui_AdditionalArtistsDetailsOptionsPage
@@ -956,34 +957,34 @@ class ArtistDetailsPlugin:
 class AdditionalArtistsDetailsOptionsPage(OptionsPage):
     """Options page for the Additional Artists Details plugin."""
 
-    TITLE = t_("ui.title", "Additional Artists Details")
+    TITLE = TxStrings.OPTIONS_PAGE_TITLE
     HELP_URL = USER_GUIDE_URL
 
-    _DELETE_CONFIRMATION_MSG_TITLE = t_('ui.delete.confirmation.title', "Confirm Database Deletion")
-    _DELETE_CONFIRMATION_MSG_TEXT = t_(
-        key='ui.delete.confirmation.message',
-        text=(
-            "You are about to delete the local persistent cache database file from your system. "
-            "There is no way to undo this action.  Continue?"
-        ),
-    )
-    _DELETE_SUCCESS_TEXT = t_(
-        key='ui.delete.success.message',
-        text="The persistent cache database file has been successfully deleted.",
-    )
-    _DELETE_RESULT_TITLE = t_('ui.delete.result.title', "Delete Database")
-    _DELETE_ERROR_TEXT = t_(
-        key='ui.delete.error.message',
-        text="There was a problem deleting the persistent cache database file.\n\nError: %s",
-    )
-    _ERR_MSG_TITLE = t_('ui.error.cache_title', "Cache Error")
-    _ERR_MSG_CACHE_IMPORT = t_('ui.error.cache_import', "Error importing the cache file.\nFile: %s\n\n%s")
-    _ERR_MSG_CACHE_EXPORT = t_('ui.error.cache_export', "Error exporting the cache file.\nFile: %s\n\n%s")
-    _SUCCESS_IMPORT = t_('ui.success.import', "Successfully imported the cache file.\nFile: %s")
-    _SUCCESS_EXPORT = t_('ui.success.export', "Successfully exported the cache file.\nFile: %s")
-    _FILTER_ALL = t_('ui.filter.all', "All files")
-    _FILTER_CSV = t_('ui.filter.csv', "CSV files")
-    _FILTER_JSON = t_('ui.filter.json', "JSON files")
+    # _DELETE_CONFIRMATION_MSG_TITLE = t_('ui.delete.confirmation.title', "Confirm Database Deletion")
+    # _DELETE_CONFIRMATION_MSG_TEXT = t_(
+    #     key='ui.delete.confirmation.message',
+    #     text=(
+    #         "You are about to delete the local persistent cache database file from your system. "
+    #         "There is no way to undo this action.  Continue?"
+    #     ),
+    # )
+    # _DELETE_SUCCESS_TEXT = t_(
+    #     key='ui.delete.success.message',
+    #     text="The persistent cache database file has been successfully deleted.",
+    # )
+    # _DELETE_RESULT_TITLE = t_('ui.delete.result.title', "Delete Database")
+    # _DELETE_ERROR_TEXT = t_(
+    #     key='ui.delete.error.message',
+    #     text="There was a problem deleting the persistent cache database file.\n\nError: %s",
+    # )
+    # _ERR_MSG_TITLE = t_('ui.error.cache_title', "Cache Error")
+    # _ERR_MSG_CACHE_IMPORT = t_('ui.error.cache_import', "Error importing the cache file.\nFile: %s\n\n%s")
+    # _ERR_MSG_CACHE_EXPORT = t_('ui.error.cache_export', "Error exporting the cache file.\nFile: %s\n\n%s")
+    # _SUCCESS_IMPORT = t_('ui.success.import', "Successfully imported the cache file.\nFile: %s")
+    # _SUCCESS_EXPORT = t_('ui.success.export', "Successfully exported the cache file.\nFile: %s")
+    # _FILTER_ALL = t_('ui.filter.all', "All files")
+    # _FILTER_CSV = t_('ui.filter.csv', "CSV files")
+    # _FILTER_JSON = t_('ui.filter.json', "JSON files")
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -1006,9 +1007,9 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
 
         self.ui.cache_file.setText(DB_FILE)
 
-        self.filter_all = SharedVars.api.tr(self._FILTER_ALL) + " (*)"
-        self.filter_csv = SharedVars.api.tr(self._FILTER_CSV) + " (*.csv)"
-        self.filter_json = SharedVars.api.tr(self._FILTER_JSON) + " (*.json)"
+        self.filter_all = SharedVars.api.tr(TxStrings.FILTER_ALL) + " (*)"
+        self.filter_csv = SharedVars.api.tr(TxStrings.FILTER_CSV) + " (*.csv)"
+        self.filter_json = SharedVars.api.tr(TxStrings.FILTER_JSON) + " (*.json)"
 
         self.user_documents_dir = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)
 
@@ -1076,13 +1077,13 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
 
         try:
             importer(filename=filepath, save_artists=self.ui.cb_save_artists.isChecked())
-            QtWidgets.QMessageBox.information(self, None, SharedVars.api.tr(self._SUCCESS_IMPORT) % (filepath,))
+            QtWidgets.QMessageBox.information(self, None, SharedVars.api.tr(TxStrings.SUCCESS_IMPORT) % (filepath,))
         except Exception as ex:
             SharedVars.api.logger.error(str(ex))
             QtWidgets.QMessageBox.critical(
                 self,
-                SharedVars.api.tr(self._ERR_MSG_TITLE),
-                SharedVars.api.tr(self._ERR_MSG_CACHE_IMPORT)
+                SharedVars.api.tr(TxStrings.ERR_MSG_TITLE),
+                SharedVars.api.tr(TxStrings.ERR_MSG_CACHE_IMPORT)
                 % (
                     filepath,
                     ex,
@@ -1103,13 +1104,13 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
 
         try:
             DatabaseUtils.export_to_csv(filename=filepath, save_artists=self.ui.cb_save_artists.isChecked())
-            QtWidgets.QMessageBox.information(self, None, SharedVars.api.tr(self._SUCCESS_EXPORT) % (filepath,))
+            QtWidgets.QMessageBox.information(self, None, SharedVars.api.tr(TxStrings.SUCCESS_EXPORT) % (filepath,))
         except Exception as ex:
             SharedVars.api.logger.error(str(ex))
             QtWidgets.QMessageBox.critical(
                 self,
-                SharedVars.api.tr(self._ERR_MSG_TITLE),
-                SharedVars.api.tr(self._ERR_MSG_CACHE_EXPORT)
+                SharedVars.api.tr(TxStrings.ERR_MSG_TITLE),
+                SharedVars.api.tr(TxStrings.ERR_MSG_CACHE_EXPORT)
                 % (
                     filepath,
                     ex,
@@ -1130,8 +1131,8 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         if (
             QtWidgets.QMessageBox.warning(
                 self,
-                SharedVars.api.tr(self._DELETE_CONFIRMATION_MSG_TITLE),
-                SharedVars.api.tr(self._DELETE_CONFIRMATION_MSG_TEXT),
+                SharedVars.api.tr(TxStrings.DELETE_CONFIRMATION_MSG_TITLE),
+                SharedVars.api.tr(TxStrings.DELETE_CONFIRMATION_MSG_TEXT),
                 QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel,
                 QtWidgets.QMessageBox.StandardButton.Cancel,
             )
@@ -1144,15 +1145,15 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
 
             QtWidgets.QMessageBox.information(
                 self,
-                SharedVars.api.tr(self._DELETE_RESULT_TITLE),
-                SharedVars.api.tr(self._DELETE_SUCCESS_TEXT),
+                SharedVars.api.tr(TxStrings.DELETE_RESULT_TITLE),
+                SharedVars.api.tr(TxStrings.DELETE_SUCCESS_TEXT),
             )
 
         except OSError as e:
             QtWidgets.QMessageBox.critical(
                 self,
-                SharedVars.api.tr(self._DELETE_RESULT_TITLE),
-                SharedVars.api.tr(self._DELETE_ERROR_TEXT) % e,
+                SharedVars.api.tr(TxStrings.DELETE_RESULT_TITLE),
+                SharedVars.api.tr(TxStrings.DELETE_ERROR_TEXT) % e,
             )
             return False
 
@@ -1169,28 +1170,28 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
 class CacheStatusPage(PicardDialog):
     """Cache Status Dialog"""
 
-    _CACHE_MISSING_TEXT = t_(
-        key='ui.notes.not_found.message',
-        text="The cache database was not found.",
-    )
+    # _CACHE_MISSING_TEXT = t_(
+    #     key='ui.notes.not_found.message',
+    #     text="The cache database was not found.",
+    # )
 
-    _ORPHANS_MSG_TEXT = t_(
-        key='ui.notes.orphans.message', text="There are orphan area records. Missing parents: %s, Orphan areas: %s"
-    )
+    # _ORPHANS_MSG_TEXT = t_(
+    #     key='ui.notes.orphans.message', text="There are orphan area records. Missing parents: %s, Orphan areas: %s"
+    # )
 
-    _NO_ORPHANS_MSG_TEXT = t_(key='ui.notes.no_orphans.message', text="There are no orphan area records.")
+    # _NO_ORPHANS_MSG_TEXT = t_(key='ui.notes.no_orphans.message', text="There are no orphan area records.")
 
-    _BACKGROUND_DISABLED_MSG_TEXT = t_(
-        key='ui.notes.background_disabled.message', text="Background processing is currently disabled."
-    )
+    # _BACKGROUND_DISABLED_MSG_TEXT = t_(
+    #     key='ui.notes.background_disabled.message', text="Background processing is currently disabled."
+    # )
 
-    _BACKGROUND_RUNNING_MSG_TEXT = t_(
-        key='ui.notes.background_running.message', text="Background processing is enabled and currently running."
-    )
+    # _BACKGROUND_RUNNING_MSG_TEXT = t_(
+    #     key='ui.notes.background_running.message', text="Background processing is enabled and currently running."
+    # )
 
-    _BACKGROUND_NOT_RUNNING_MSG_TEXT = t_(
-        key='ui.notes.background_not_running.message', text="Background processing is enabled but currently not running."
-    )
+    # _BACKGROUND_NOT_RUNNING_MSG_TEXT = t_(
+    #     key='ui.notes.background_not_running.message', text="Background processing is enabled but currently not running."
+    # )
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -1206,21 +1207,21 @@ class CacheStatusPage(PicardDialog):
             (artist, area) = DatabaseUtils.get_counts()
             parents, children = DatabaseUtils.get_orphan_areas_count()
             if parents > 0:
-                notes = SharedVars.api.tr(self._ORPHANS_MSG_TEXT) % (parents, children)
+                notes = SharedVars.api.tr(TxStrings.ORPHANS_MSG_TEXT) % (parents, children)
             else:
-                notes = SharedVars.api.tr(self._NO_ORPHANS_MSG_TEXT)
+                notes = SharedVars.api.tr(TxStrings.NO_ORPHANS_MSG_TEXT)
         else:
-            notes = SharedVars.api.tr(self._CACHE_MISSING_TEXT)
+            notes = SharedVars.api.tr(TxStrings.CACHE_MISSING_TEXT)
             (artist, area) = (None, None)
 
         # Set note regarding background processing
         if SharedVars.background_processing_enabled:
             if SharedVars.background_processing_running:
-                notes += '\n' + SharedVars.api.tr(self._BACKGROUND_RUNNING_MSG_TEXT)
+                notes += '\n' + SharedVars.api.tr(TxStrings.BACKGROUND_RUNNING_MSG_TEXT)
             else:
-                notes += '\n' + SharedVars.api.tr(self._BACKGROUND_NOT_RUNNING_MSG_TEXT)
+                notes += '\n' + SharedVars.api.tr(TxStrings.BACKGROUND_NOT_RUNNING_MSG_TEXT)
         else:
-            notes += '\n' + SharedVars.api.tr(self._BACKGROUND_DISABLED_MSG_TEXT)
+            notes += '\n' + SharedVars.api.tr(TxStrings.BACKGROUND_DISABLED_MSG_TEXT)
 
         # Set database cache notes in display
         self.ui.status_note.setText(notes)
@@ -1237,28 +1238,28 @@ class CacheStatusPage(PicardDialog):
 class CacheEditorPage(PicardDialog):
     """Cache Editor Dialog"""
 
-    _CONFIRMATION_MSG_TITLE = t_('ui.remove.confirmation.title', "Confirm Removal")
-    _CONFIRMATION_MSG_TEXT = t_(
-        key='ui.remove.confirmation.message',
-        text="You are about to remove {n} artist record from the cache.  Continue?",
-        plural="You are about to remove {n} artist records from the cache.  Continue?",
-    )
-    _SUCCESS_MSG_TITLE = t_('ui.remove.success.title', "Artist Removal Success")
-    _SUCCESS_MSG_TEXT = t_(
-        key='ui.remove.success.message',
-        text="Artist removal from the cache successfully completed.",
-    )
-    _FILTER_STATUS_UNFILTERED = t_('ui.filter_status.unfiltered', "(unfiltered)")
-    _FILTER_STATUS_FILTERED = t_(
-        key='ui.filter_status.filtered',
-        text="({n} item)",
-        plural="({n} items)",
-    )
-    _NO_ARTISTS_TITLE = t_('ui.no_artists.title', "No Artists")
-    _NO_ARTISTS_TEXT = t_(
-        key='ui.no_artists.message',
-        text="There were no artists found in the cache.  The editor will now close.",
-    )
+    # _CONFIRMATION_MSG_TITLE = t_('ui.remove.confirmation.title', "Confirm Removal")
+    # _CONFIRMATION_MSG_TEXT = t_(
+    #     key='ui.remove.confirmation.message',
+    #     text="You are about to remove {n} artist record from the cache.  Continue?",
+    #     plural="You are about to remove {n} artist records from the cache.  Continue?",
+    # )
+    # _SUCCESS_MSG_TITLE = t_('ui.remove.success.title', "Artist Removal Success")
+    # _SUCCESS_MSG_TEXT = t_(
+    #     key='ui.remove.success.message',
+    #     text="Artist removal from the cache successfully completed.",
+    # )
+    # _FILTER_STATUS_UNFILTERED = t_('ui.filter_status.unfiltered', "(unfiltered)")
+    # _FILTER_STATUS_FILTERED = t_(
+    #     key='ui.filter_status.filtered',
+    #     text="({n} item)",
+    #     plural="({n} items)",
+    # )
+    # _NO_ARTISTS_TITLE = t_('ui.no_artists.title', "No Artists")
+    # _NO_ARTISTS_TEXT = t_(
+    #     key='ui.no_artists.message',
+    #     text="There were no artists found in the cache.  The editor will now close.",
+    # )
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -1319,10 +1320,10 @@ class CacheEditorPage(PicardDialog):
         """Display count of filtered items."""
         if self.ui.filter_text.text():
             self.ui.filter_status_label.setText(
-                SharedVars.api.trn(*self._FILTER_STATUS_FILTERED, n=len(self.matched_items))
+                SharedVars.api.trn(*TxStrings.FILTER_STATUS_FILTERED, n=len(self.matched_items))
             )
         else:
-            self.ui.filter_status_label.setText(SharedVars.api.tr(self._FILTER_STATUS_UNFILTERED))
+            self.ui.filter_status_label.setText(SharedVars.api.tr(TxStrings.FILTER_STATUS_UNFILTERED))
 
     def filter_changed(self) -> None:
         """Process updated filter string."""
@@ -1410,8 +1411,8 @@ class CacheEditorPage(PicardDialog):
         if (
             QtWidgets.QMessageBox.warning(
                 self,
-                SharedVars.api.tr(self._CONFIRMATION_MSG_TITLE),
-                SharedVars.api.trn(*self._CONFIRMATION_MSG_TEXT, n=count),
+                SharedVars.api.tr(TxStrings.CONFIRMATION_MSG_TITLE),
+                SharedVars.api.trn(*TxStrings.CONFIRMATION_MSG_TEXT, n=count),
                 QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel,
                 QtWidgets.QMessageBox.StandardButton.Cancel,
             )
@@ -1428,11 +1429,12 @@ class CacheEditorPage(PicardDialog):
                 artists.append(mbid)
 
         DatabaseUtils.remove_artists(artists)
+        DatabaseUtils.compact_database()
 
         QtWidgets.QMessageBox.information(
             self,
-            SharedVars.api.tr(self._SUCCESS_MSG_TITLE),
-            SharedVars.api.tr(self._SUCCESS_MSG_TEXT),
+            SharedVars.api.tr(TxStrings.SUCCESS_MSG_TITLE),
+            SharedVars.api.tr(TxStrings.SUCCESS_MSG_TEXT),
         )
 
         self.close()
@@ -1477,8 +1479,8 @@ class CacheEditorPage(PicardDialog):
 
         QtWidgets.QMessageBox.warning(
             self,
-            SharedVars.api.tr(self._NO_ARTISTS_TITLE),
-            SharedVars.api.tr(self._NO_ARTISTS_TEXT),
+            SharedVars.api.tr(TxStrings.NO_ARTISTS_TITLE),
+            SharedVars.api.tr(TxStrings.NO_ARTISTS_TEXT),
             QtWidgets.QMessageBox.StandardButton.Ok,
             QtWidgets.QMessageBox.StandardButton.Ok,
         )
@@ -1507,12 +1509,48 @@ def initialize_cache_db() -> None:
 
 
 class BackgroundProcessingAction(BaseAction):
-    MENU = (t_("ui.action.sub_menu.title", "Additional Artists Details"),)
-    TITLE = t_("ui.action.background_processing.title", "Start background processing")
+    MENU = TxStrings.MENU
+    TITLE = TxStrings.START_PROCESSING
 
     def callback(self, objs):
         SharedVars.api.logger.debug("Background area retrieval processing started.")
         ArtistDetailsPlugin.process_orphan_areas()
+
+
+class CompactDatabaseAction(BaseAction):
+    MENU = TxStrings.MENU
+    TITLE = TxStrings.COMPACT_DATABASE
+
+    def callback(self, objs):
+        if not os.path.exists(DB_FILE):
+            QtWidgets.QMessageBox.warning(
+                SharedVars.api.tagger.window,
+                SharedVars.api.tr(TxStrings.COMPACT_DATABASE),
+                SharedVars.api.tr(TxStrings.CACHE_MISSING_TEXT),
+                QtWidgets.QMessageBox.StandardButton.Ok,
+                QtWidgets.QMessageBox.StandardButton.Ok,
+            )
+            return
+        SharedVars.api.logger.debug("Compacting the database.")
+        old_size = os.path.getsize(DB_FILE)
+        if DatabaseUtils.compact_database():
+            new_size = os.path.getsize(DB_FILE)
+            size_diff = old_size - new_size
+            QtWidgets.QMessageBox.information(
+                SharedVars.api.tagger.window,
+                SharedVars.api.tr(TxStrings.COMPACT_DATABASE),
+                f"{SharedVars.api.tr(TxStrings.COMPACT_DATABASE_OKAY)} {format_bytes(size_diff)}",
+                QtWidgets.QMessageBox.StandardButton.Ok,
+                QtWidgets.QMessageBox.StandardButton.Ok,
+            )
+            return
+        QtWidgets.QMessageBox.critical(
+            SharedVars.api.tagger.window,
+            SharedVars.api.tr(TxStrings.COMPACT_DATABASE),
+            SharedVars.api.tr(TxStrings.COMPACT_DATABASE_ERROR),
+            QtWidgets.QMessageBox.StandardButton.Ok,
+            QtWidgets.QMessageBox.StandardButton.Ok,
+        )
 
 
 def enable(api: PluginApi) -> None:
@@ -1561,6 +1599,9 @@ def enable(api: PluginApi) -> None:
 
     # Register menu action to start background processing
     api.register_tools_menu_action(BackgroundProcessingAction)
+
+    # Register menu action to compact the database
+    api.register_tools_menu_action(CompactDatabaseAction)
 
 
 def disable():

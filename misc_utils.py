@@ -121,3 +121,26 @@ def artist_entity_to_key_value_pairs(entity: ArtistEntity) -> list[tuple[str, st
         ('end-area', entity.end_area),
         ('disambiguation', entity.disambiguation),
     ]
+
+
+def format_bytes(size: int) -> str:
+    """Format the number of bytes as 'b', 'k', 'M' or 'G'.
+
+    Args:
+        size (int): Size to format
+
+    Returns:
+        str: Formatted size.
+    """
+    sign = '-' if size < 0 else ''
+    size = abs(size)
+    k = 1024
+    m = k * k
+    g = m * k
+    if size < k:
+        return f"{sign}{size:,}b"
+    if size < m:
+        return f"{sign}{round(float(size) / float(k), 2)}k"
+    if size < g:
+        return f"{sign}{round(float(size) / float(m), 2)}M"
+    return f"{sign}{round(float(size) / float(g), 2):,}G"

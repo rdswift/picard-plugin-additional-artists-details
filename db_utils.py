@@ -232,6 +232,26 @@ class DatabaseUtils:
         cls.update_database_schema()
 
     @classmethod
+    def compact_database(cls) -> bool:
+        """Compact the database.
+
+        Returns:
+            bool: True on success, otherwise False.
+        """
+        if not os.path.exists(DB_FILE):
+            return False
+
+        with cls.connect_to_database() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute("VACUUM;")
+                conn.commit()
+            except sqlite3.Error as ex:
+                cls.log_error('compact_database()', ex)
+                return False
+        return True
+
+    @classmethod
     def import_from_json(cls, filename: str, save_artists: bool | None = None) -> None:
         """Import artist and area data from a JSON file into the database.
 
