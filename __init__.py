@@ -870,13 +870,12 @@ class ArtistDetailsPlugin:
             return
 
         SharedVars.background_processing_running = True
-        for area in DatabaseUtils.get_missing_parent_areas():
+        area = DatabaseUtils.get_missing_parent_area()
+        if area:
             QTimer.singleShot(
                 SharedVars.background_processing_interval * 1000,
                 partial(cls._get_single_area_info, area_id=area),
             )
-            # Only queue one item at a time.
-            break
 
     @classmethod
     def _get_single_area_info(cls, area_id: str) -> None:
@@ -959,32 +958,6 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
 
     TITLE = TxStrings.OPTIONS_PAGE_TITLE
     HELP_URL = USER_GUIDE_URL
-
-    # _DELETE_CONFIRMATION_MSG_TITLE = t_('ui.delete.confirmation.title', "Confirm Database Deletion")
-    # _DELETE_CONFIRMATION_MSG_TEXT = t_(
-    #     key='ui.delete.confirmation.message',
-    #     text=(
-    #         "You are about to delete the local persistent cache database file from your system. "
-    #         "There is no way to undo this action.  Continue?"
-    #     ),
-    # )
-    # _DELETE_SUCCESS_TEXT = t_(
-    #     key='ui.delete.success.message',
-    #     text="The persistent cache database file has been successfully deleted.",
-    # )
-    # _DELETE_RESULT_TITLE = t_('ui.delete.result.title', "Delete Database")
-    # _DELETE_ERROR_TEXT = t_(
-    #     key='ui.delete.error.message',
-    #     text="There was a problem deleting the persistent cache database file.\n\nError: %s",
-    # )
-    # _ERR_MSG_TITLE = t_('ui.error.cache_title', "Cache Error")
-    # _ERR_MSG_CACHE_IMPORT = t_('ui.error.cache_import', "Error importing the cache file.\nFile: %s\n\n%s")
-    # _ERR_MSG_CACHE_EXPORT = t_('ui.error.cache_export', "Error exporting the cache file.\nFile: %s\n\n%s")
-    # _SUCCESS_IMPORT = t_('ui.success.import', "Successfully imported the cache file.\nFile: %s")
-    # _SUCCESS_EXPORT = t_('ui.success.export', "Successfully exported the cache file.\nFile: %s")
-    # _FILTER_ALL = t_('ui.filter.all', "All files")
-    # _FILTER_CSV = t_('ui.filter.csv', "CSV files")
-    # _FILTER_JSON = t_('ui.filter.json', "JSON files")
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -1170,29 +1143,6 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
 class CacheStatusPage(PicardDialog):
     """Cache Status Dialog"""
 
-    # _CACHE_MISSING_TEXT = t_(
-    #     key='ui.notes.not_found.message',
-    #     text="The cache database was not found.",
-    # )
-
-    # _ORPHANS_MSG_TEXT = t_(
-    #     key='ui.notes.orphans.message', text="There are orphan area records. Missing parents: %s, Orphan areas: %s"
-    # )
-
-    # _NO_ORPHANS_MSG_TEXT = t_(key='ui.notes.no_orphans.message', text="There are no orphan area records.")
-
-    # _BACKGROUND_DISABLED_MSG_TEXT = t_(
-    #     key='ui.notes.background_disabled.message', text="Background processing is currently disabled."
-    # )
-
-    # _BACKGROUND_RUNNING_MSG_TEXT = t_(
-    #     key='ui.notes.background_running.message', text="Background processing is enabled and currently running."
-    # )
-
-    # _BACKGROUND_NOT_RUNNING_MSG_TEXT = t_(
-    #     key='ui.notes.background_not_running.message', text="Background processing is enabled but currently not running."
-    # )
-
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
 
@@ -1237,29 +1187,6 @@ class CacheStatusPage(PicardDialog):
 
 class CacheEditorPage(PicardDialog):
     """Cache Editor Dialog"""
-
-    # _CONFIRMATION_MSG_TITLE = t_('ui.remove.confirmation.title', "Confirm Removal")
-    # _CONFIRMATION_MSG_TEXT = t_(
-    #     key='ui.remove.confirmation.message',
-    #     text="You are about to remove {n} artist record from the cache.  Continue?",
-    #     plural="You are about to remove {n} artist records from the cache.  Continue?",
-    # )
-    # _SUCCESS_MSG_TITLE = t_('ui.remove.success.title', "Artist Removal Success")
-    # _SUCCESS_MSG_TEXT = t_(
-    #     key='ui.remove.success.message',
-    #     text="Artist removal from the cache successfully completed.",
-    # )
-    # _FILTER_STATUS_UNFILTERED = t_('ui.filter_status.unfiltered', "(unfiltered)")
-    # _FILTER_STATUS_FILTERED = t_(
-    #     key='ui.filter_status.filtered',
-    #     text="({n} item)",
-    #     plural="({n} items)",
-    # )
-    # _NO_ARTISTS_TITLE = t_('ui.no_artists.title', "No Artists")
-    # _NO_ARTISTS_TEXT = t_(
-    #     key='ui.no_artists.message',
-    #     text="There were no artists found in the cache.  The editor will now close.",
-    # )
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)

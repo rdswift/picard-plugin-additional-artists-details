@@ -40,7 +40,7 @@ from .misc_utils import (
 class DatabaseUtils:
     """Utility functions for working with the plugin's database."""
 
-    DB_VERSION: int = 1
+    DB_VERSION: int = 2
 
     _INSERT_ARTIST: str = (
         "INSERT OR REPLACE INTO artists (mbid, name, sort, type, gender, area, begin, begin_area, "
@@ -73,33 +73,55 @@ class DatabaseUtils:
 
         This method checks the current version of the database and applies any necessary schema updates.
         """
+        fcn = 'update_database_schema()'
         current_version = cls.get_db_version()
 
         if current_version >= cls.DB_VERSION:
             return  # Database is already up-to-date
 
-        try:
-            with cls.connect_to_database() as conn:
-                cursor = conn.cursor()
-                # # Example of a schema update for version 2
-                # if current_version < 2:
-                #     if api:
-                #         api.logger.debug("Updating database schema to version 2.")
-                #     cursor.execute("ALTER TABLE artists ADD COLUMN new_column TEXT;")
-                #     conn.commit()
-                #     cls.set_db_version(2)
-                #     current_version = 2  # Update current_version after applying the update
-                # # Example of a schema update for version 3
-                # if current_version < 3:
-                #     if api:
-                #         api.logger.debug("Updating database schema to version 3.")
-                #     cursor.execute("ALTER TABLE artists ADD COLUMN new_column TEXT;")
-                #     conn.commit()
-                #     cls.set_db_version(3)
-                #     current_version = 3  # Update current_version after applying the update
+        # Update for version 2
+        #   - Replace MBID type codes with internal short codes
+        if current_version < 2:
+            if SharedVars.api:
+                SharedVars.api.logger.info("Updating database to version 2.")
+
+            try:
+                with cls.connect_to_database() as conn:
+                    cursor = conn.cursor()
+                    sql = 'UPDATE areas SET type=? WHERE type=?;'
+                    for key, value in AreaType.type_to_short.items():
+                        cursor.execute(sql, (value, key))
+                    conn.commit()
                 cursor.close()
-        except sqlite3.Error as ex:
-            cls.log_error('update_database_schema()', ex)
+
+            except sqlite3.Error as ex:
+                cls.log_error(fcn, ex)
+                return
+
+            current_version = 2  # Update current_version after applying the update
+            cls.set_db_version(2)
+            cls.compact_database()
+
+        # Update for version 3
+        # # Example of a schema update for version 3
+        # if current_version < 3:
+        #     if SharedVars.api:
+        #         SharedVars.api.logger.info("Updating database schema to version 3.")
+
+        #     try:
+        #         with cls.connect_to_database() as conn:
+        #             cursor = conn.cursor()
+        #             cursor.execute("ALTER TABLE artists ADD COLUMN new_column TEXT;")
+        #             conn.commit()
+        #         cursor.close()
+
+        #     except sqlite3.Error as ex:
+        #         cls.log_error(fcn, ex)
+        #         return
+
+        #     current_version = 3  # Update current_version after applying the update
+        #     cls.set_db_version(3)
+        #     cls.compact_database()
 
     @classmethod
     def get_db_version(cls) -> int:
@@ -305,7 +327,7 @@ class DatabaseUtils:
                         area.get('parent', ''),
                         area.get('name', 'Unknown Area'),
                         area.get('country', ''),
-                        area.get('area_type', ''),
+                        AreaType.get_short(area.get('area_type', '')),
                     ),
                 )
             conn.commit()
@@ -359,7 +381,7 @@ class DatabaseUtils:
                             continue  # Invalid country code
                         if row[5] not in AreaType.all_mbids:
                             continue  # Invalid area type MBID
-                        cursor.execute(cls._INSERT_AREA, (row[1], row[2], row[3], row[4], row[5]))
+                        cursor.execute(cls._INSERT_AREA, (row[1], row[2], row[3], row[4], AreaType.get_short(row[5])))
 
                     # Artist row processing
                     if not save_artists:
@@ -437,7 +459,18 @@ class DatabaseUtils:
                 cursor.execute(cls._SELECT_AREA + " ORDER BY name ASC;")
                 row = cursor.fetchone()
                 while row is not None:
-                    writer.writerow(('area',) + row + (AreaType.titles.get(row[4], 'Unknown area type'),))
+                    type_mbid = AreaType.get_mbid(row[4])
+                    writer.writerow(
+                        (
+                            'area',
+                            row[0],
+                            row[1],
+                            row[2],
+                            row[3],
+                            type_mbid,
+                            AreaType.titles.get(type_mbid, 'Unknown area type'),
+                        )
+                    )
                     row = cursor.fetchone()
 
                 # Write artist records
@@ -482,17 +515,7 @@ class DatabaseUtils:
                 cursor = conn.cursor()
                 cursor.execute(cls._SELECT_AREA + " WHERE mbid=?;", (mbid,))
                 row = cursor.fetchone()
-            return (
-                AreaEntity(
-                    mbid=row[0],
-                    name=row[2],
-                    type=row[4],
-                    parent=row[1],
-                    country=row[3],
-                )
-                if row
-                else None
-            )
+            return cls._area_from_row(row) if row else None
 
         except sqlite3.Error as ex:
             cls.log_error('get_area()', ex)
@@ -552,7 +575,7 @@ class DatabaseUtils:
         try:
             with cls.connect_to_database() as conn:
                 cursor = conn.cursor()
-                cursor.execute(cls._INSERT_AREA, (area.mbid, area.parent, area.name, area.country, area.type))
+                cursor.execute(cls._INSERT_AREA, (area.mbid, area.parent, area.name, area.country, AreaType.get_short(area.type)))
                 conn.commit()
 
         except sqlite3.Error as ex:
@@ -657,7 +680,7 @@ class DatabaseUtils:
         return AreaEntity(
             mbid=row[0],
             name=row[2],
-            type=row[4],
+            type=AreaType.get_mbid(row[4]),
             parent=row[1],
             country=row[3],
         )
@@ -747,14 +770,14 @@ class DatabaseUtils:
         return (0, 0)
 
     @classmethod
-    def get_missing_parent_areas(cls) -> Generator[str, None, None]:
-        """Get the missing parent areas in the database.
+    def get_missing_parent_area(cls) -> str:
+        """Get a single missing parent MBID from the database.
 
-        Yields:
-            Generator[str]: Missing parent area MBIDs.
+        Returns:
+            str: MBID of the missing record, or empty string if no missing records.
         """
         if not os.path.exists(DB_FILE):
-            return  # Database does not exist
+            return ''   # Database does not exist
 
         try:
             with cls.connect_to_database() as conn:
@@ -763,9 +786,11 @@ class DatabaseUtils:
                     'SELECT DISTINCT parent FROM areas WHERE parent <> "" AND parent NOT IN (SELECT mbid from areas);'
                 )
                 row = cursor.fetchone()
-                while row is not None:
-                    yield row[0]
-                    row = cursor.fetchone()
+                cursor.close()
+                if row is not None:
+                    return row[0]
 
         except sqlite3.Error as ex:
             cls.log_error('get_orphan_areas()', ex)
+
+        return ''

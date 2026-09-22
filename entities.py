@@ -15,10 +15,7 @@
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, see <https://www.gnu.org/licenses/>.
 
-from dataclasses import (
-    dataclass,
-    # asdict,
-)
+from dataclasses import dataclass
 
 
 class AreaType:
@@ -29,21 +26,24 @@ class AreaType:
         mbid: str
         """MBID of the area type"""
 
+        short_type: str
+        """Short (internal) area type code"""
+
         title: str
         """Title of the area type"""
 
         conditional: bool
         """Indicator or whether the area type is conditional"""
 
-    COUNTRY = AreaTypeData("06dd0ae4-8c74-30bb-b43d-95dcedf961de", "Country", False)
-    SUBDIVISION = AreaTypeData("fd3d44c5-80a1-3842-9745-2c4972d35afa", "Subdivision", True)
-    CITY = AreaTypeData("6fd8f29a-3d0a-32fc-980d-ea697b69da78", "City", False)
-    MUNICIPALITY = AreaTypeData("17246454-5ac4-36a1-b81a-4753eb2dab20", "Municipality", True)
-    DISTRICT = AreaTypeData("84039871-5e47-38ca-a66a-45e512c8290f", "District", False)
-    ISLAND = AreaTypeData("3f8e7b66-058b-369b-9834-ffa5fcba5641", "Island", False)
-    COUNTY = AreaTypeData("bcecec27-8bdb-3e00-8254-d948dda502fa", "County", True)
-    MILITARY_BASE = AreaTypeData("bbb27bc1-f21c-42a9-89ce-e9d986d60b46", "Military base", False)
-    INDIGINOUS = AreaTypeData("9bdda430-e4d4-464a-94a9-084a452ea8ea", "Indigenous territory / reserve", False)
+    COUNTRY = AreaTypeData("06dd0ae4-8c74-30bb-b43d-95dcedf961de", "A", "Country", False)
+    SUBDIVISION = AreaTypeData("fd3d44c5-80a1-3842-9745-2c4972d35afa", "B", "Subdivision", True)
+    CITY = AreaTypeData("6fd8f29a-3d0a-32fc-980d-ea697b69da78", "C", "City", False)
+    MUNICIPALITY = AreaTypeData("17246454-5ac4-36a1-b81a-4753eb2dab20", "D", "Municipality", True)
+    DISTRICT = AreaTypeData("84039871-5e47-38ca-a66a-45e512c8290f", "E", "District", False)
+    ISLAND = AreaTypeData("3f8e7b66-058b-369b-9834-ffa5fcba5641", "F", "Island", False)
+    COUNTY = AreaTypeData("bcecec27-8bdb-3e00-8254-d948dda502fa", "G", "County", True)
+    MILITARY_BASE = AreaTypeData("bbb27bc1-f21c-42a9-89ce-e9d986d60b46", "H", "Military base", False)
+    INDIGINOUS = AreaTypeData("9bdda430-e4d4-464a-94a9-084a452ea8ea", "I", "Indigenous territory / reserve", False)
 
     _all_types: list[AreaTypeData] = [
         COUNTRY,
@@ -68,6 +68,36 @@ class AreaType:
 
     unconditional_mbids: list[str] = [x.mbid for x in _all_types if not x.conditional]
     """List of all unconditional area type MBIDs"""
+
+    short_to_type: dict[str, str] = {x.short_type: x.mbid for x in _all_types}
+    """Dictionary of MBID type codes by internal short type code"""
+
+    type_to_short: dict[str, str] = {x.mbid: x.short_type for x in _all_types}
+    """Dictionary of internal short type codes by MBID type code"""
+
+    @classmethod
+    def get_short(cls, code: str) -> str:
+        """Get the internal short type code for the specified type MBID.
+
+        Args:
+            code (str): MBID area type code to look up.
+
+        Returns:
+            str: Internal short area type code.
+        """
+        return cls.type_to_short.get(code, '')
+
+    @classmethod
+    def get_mbid(cls, code: str) -> str:
+        """Get the MBID type code for the specified internal short type code.
+
+        Args:
+            code (str): Internal short area type code.
+
+        Returns:
+            str: MBID area type code.
+        """
+        return cls.short_to_type.get(code, '')
 
 
 @dataclass
