@@ -57,6 +57,7 @@
 "ui.action.compact_database.title" = "Compact the cache database"
 "ui.action.compact_database_error.text" = "There was an error while compacting the database file.  Please see the log for details."
 "ui.action.compact_database_okay.text" = "The database file was compacted successfully.\n\nFile size reduction:"
+"ui.action.display_cache_status.title" = "Display the cache status"
 "ui.action.sub_menu.title" = "Additional Artists Details"
 "ui.delete.confirmation.message" = "You are about to delete the local persistent cache database file from your system. There is no way to undo this action.  Continue?"
 "ui.delete.confirmation.title" = "Confirm Database Deletion"

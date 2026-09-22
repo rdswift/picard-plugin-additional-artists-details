@@ -1490,6 +1490,15 @@ class CompactDatabaseAction(BaseAction):
         )
 
 
+class DisplayCacheStatusAction(BaseAction):
+    MENU = TxStrings.MENU
+    TITLE = TxStrings.DISPLAY_STATUS
+
+    def callback(self, objs):
+        page = CacheStatusPage(SharedVars.api.tagger.window)
+        page.exec()
+
+
 def enable(api: PluginApi) -> None:
     """Called when the plugin is enabled.
 
@@ -1539,6 +1548,9 @@ def enable(api: PluginApi) -> None:
 
     # Register menu action to compact the database
     api.register_tools_menu_action(CompactDatabaseAction)
+
+    # Register menu action to display the cache status
+    api.register_tools_menu_action(DisplayCacheStatusAction)
 
 
 def disable():

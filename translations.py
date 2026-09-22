@@ -114,3 +114,4 @@ class TxStrings:
         "ui.action.compact_database_error.text",
         "There was an error while compacting the database file.  Please see the log for details.",
     )
+    DISPLAY_STATUS = t_("ui.action.display_cache_status.title", "Display the cache status")

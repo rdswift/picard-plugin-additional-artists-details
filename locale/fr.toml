@@ -57,6 +57,7 @@
 "ui.action.compact_database.title" = "Compresser la base de données du cache"
 "ui.action.compact_database_error.text" = "Une erreur s'est produite lors de la compression du fichier de base de données. Veuillez consulter le journal pour plus de détails."
 "ui.action.compact_database_okay.text" = "Le fichier de base de données a été compacté avec succès.\n\nRéduction de la taille du fichier :"
+"ui.action.display_cache_status.title" = "Afficher l'état du cache"
 "ui.action.sub_menu.title" = "Informations supplémentaires sur les artistes"
 "ui.delete.confirmation.message" = "Vous êtes sur le point de supprimer le fichier de base de données du cache persistant local de votre système. Il n'est pas possible d'annuler cette action. Voulez-vous continuer ?"
 "ui.delete.confirmation.title" = "Confirmer la suppression de la base de données"
