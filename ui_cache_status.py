@@ -9,12 +9,12 @@
 from PyQt6 import QtCore, QtGui, QtWidgets  # noqa: F401
 
 
-class Ui_AdditionalArtistsDetailsCacheStatus:
+class Ui_AdditionalArtistsDetailsCacheStatus(object):
     def setupUi(self, AdditionalArtistsDetailsCacheStatus):
         AdditionalArtistsDetailsCacheStatus.setObjectName("AdditionalArtistsDetailsCacheStatus")
         AdditionalArtistsDetailsCacheStatus.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
-        AdditionalArtistsDetailsCacheStatus.resize(500, 250)
-        AdditionalArtistsDetailsCacheStatus.setMinimumSize(QtCore.QSize(500, 250))
+        AdditionalArtistsDetailsCacheStatus.resize(500, 340)
+        AdditionalArtistsDetailsCacheStatus.setMinimumSize(QtCore.QSize(500, 300))
         self.verticalLayout = QtWidgets.QVBoxLayout(AdditionalArtistsDetailsCacheStatus)
         self.verticalLayout.setObjectName("verticalLayout")
         self.page_title = QtWidgets.QLabel(parent=AdditionalArtistsDetailsCacheStatus)
@@ -34,21 +34,15 @@ class Ui_AdditionalArtistsDetailsCacheStatus:
         self.status_description.setWordWrap(True)
         self.status_description.setObjectName("status_description")
         self.verticalLayout.addWidget(self.status_description)
-        spacerItem = QtWidgets.QSpacerItem(
-            20, 6, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed
-        )
+        spacerItem = QtWidgets.QSpacerItem(20, 6, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         self.verticalLayout.addItem(spacerItem)
         self.gridLayout = QtWidgets.QGridLayout()
         self.gridLayout.setContentsMargins(-1, 0, -1, -1)
         self.gridLayout.setObjectName("gridLayout")
-        spacerItem1 = QtWidgets.QSpacerItem(
-            40, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum
-        )
+        spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
         self.gridLayout.addItem(spacerItem1, 0, 0, 1, 1)
         self.artists_label = QtWidgets.QLabel(parent=AdditionalArtistsDetailsCacheStatus)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Preferred
-        )
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Preferred)
         sizePolicy.setHorizontalStretch(1)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.artists_label.sizePolicy().hasHeightForWidth())
@@ -60,9 +54,7 @@ class Ui_AdditionalArtistsDetailsCacheStatus:
         self.artists_label.setObjectName("artists_label")
         self.gridLayout.addWidget(self.artists_label, 0, 1, 1, 1)
         self.areas_label = QtWidgets.QLabel(parent=AdditionalArtistsDetailsCacheStatus)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Preferred
-        )
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Preferred)
         sizePolicy.setHorizontalStretch(1)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.areas_label.sizePolicy().hasHeightForWidth())
@@ -74,9 +66,7 @@ class Ui_AdditionalArtistsDetailsCacheStatus:
         self.areas_label.setObjectName("areas_label")
         self.gridLayout.addWidget(self.areas_label, 0, 2, 1, 1)
         self.session_cache_label = QtWidgets.QLabel(parent=AdditionalArtistsDetailsCacheStatus)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Preferred
-        )
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Preferred)
         sizePolicy.setHorizontalStretch(2)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.session_cache_label.sizePolicy().hasHeightForWidth())
@@ -107,9 +97,7 @@ class Ui_AdditionalArtistsDetailsCacheStatus:
         self.database_areas_count.setObjectName("database_areas_count")
         self.gridLayout.addWidget(self.database_areas_count, 2, 2, 1, 1)
         self.verticalLayout.addLayout(self.gridLayout)
-        spacerItem2 = QtWidgets.QSpacerItem(
-            20, 12, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed
-        )
+        spacerItem2 = QtWidgets.QSpacerItem(20, 12, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         self.verticalLayout.addItem(spacerItem2)
         self.status_note_label = QtWidgets.QLabel(parent=AdditionalArtistsDetailsCacheStatus)
         font = QtGui.QFont()
@@ -119,15 +107,12 @@ class Ui_AdditionalArtistsDetailsCacheStatus:
         self.verticalLayout.addWidget(self.status_note_label)
         self.status_note = QtWidgets.QLabel(parent=AdditionalArtistsDetailsCacheStatus)
         self.status_note.setText("")
-        self.status_note.setAlignment(
-            QtCore.Qt.AlignmentFlag.AlignLeading | QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop
-        )
+        self.status_note.setTextFormat(QtCore.Qt.TextFormat.MarkdownText)
+        self.status_note.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeading | QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
         self.status_note.setWordWrap(True)
         self.status_note.setObjectName("status_note")
         self.verticalLayout.addWidget(self.status_note)
-        spacerItem3 = QtWidgets.QSpacerItem(
-            20, 40, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding
-        )
+        spacerItem3 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding)
         self.verticalLayout.addItem(spacerItem3)
         self.buttonBox = QtWidgets.QDialogButtonBox(parent=AdditionalArtistsDetailsCacheStatus)
         self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.StandardButton.Close)
@@ -139,9 +124,7 @@ class Ui_AdditionalArtistsDetailsCacheStatus:
 
     def retranslateUi(self, AdditionalArtistsDetailsCacheStatus):
         _translate = QtCore.QCoreApplication.translate
-        AdditionalArtistsDetailsCacheStatus.setWindowTitle(
-            _translate("AdditionalArtistsDetailsCacheStatus", "window.title")
-        )
+        AdditionalArtistsDetailsCacheStatus.setWindowTitle(_translate("AdditionalArtistsDetailsCacheStatus", "window.title"))
         self.page_title.setText(_translate("AdditionalArtistsDetailsCacheStatus", "page.title"))
         self.status_description.setText(_translate("AdditionalArtistsDetailsCacheStatus", "page.description"))
         self.artists_label.setText(_translate("AdditionalArtistsDetailsCacheStatus", "label.artists"))

@@ -56,6 +56,14 @@ class TxStrings:
         key='ui.notes.not_found.message',
         text="The cache database was not found.",
     )
+    DATABASE_CACHE_DISABLED = t_(
+        key='ui.notes.database_cache_disabled',
+        text="The cache database is currently disabled. The in-memory session cache is being used.",
+    )
+    SESSION_CACHE_DISABLED = t_(
+        key='ui.notes.session_cache_disabled',
+        text="The in-memory session cache is currently disabled because the cache database is being used.",
+    )
     ORPHANS_MSG_TEXT = t_(
         key='ui.notes.orphans.message', text="There are orphan area records. Missing parents: %s, Orphan areas: %s"
     )

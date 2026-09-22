@@ -17,6 +17,7 @@
 
 import threading
 
+from .common import SharedVars
 from .db_utils import DatabaseUtils
 from .entities import (
     AreaEntity,
@@ -44,6 +45,10 @@ class DataCache:
         Args:
             artist_info (ArtistEntity): Artist information to store.
         """
+        if SharedVars.use_persistent_cache:
+            # Don't save to session cache if persistent cache is enabled
+            return
+
         with lock:
             cls.artist_cache[artist_info.mbid] = artist_info
 
@@ -85,6 +90,10 @@ class DataCache:
         Args:
             area_info (AreaEntity): Area information to store.
         """
+        if SharedVars.use_persistent_cache:
+            # Don't save to session cache if persistent cache is enabled
+            return
+
         with lock:
             cls.area_cache[area_info.mbid] = area_info
 
@@ -107,3 +116,9 @@ class DataCache:
             cls.set_area_info(entity)
 
         return entity
+
+    @classmethod
+    def clear_cache(cls) -> None:
+        """Clear the session cache dictionaries."""
+        cls.area_cache = {}
+        cls.artist_cache = {}

@@ -561,6 +561,7 @@ class DatabaseUtils:
         if not os.path.exists(DB_FILE):
             return False  # Database does not exist
 
+        # Validate data to be saved
         if not is_valid_mbid(area.mbid):
             return False  # Invalid area MBID
         if not area.name.strip():
@@ -599,6 +600,8 @@ class DatabaseUtils:
 
         if not SharedVars.save_artists:
             return False  # Saving artists not enabled
+
+        # Validate data to be saved
         if not is_valid_mbid(artist.mbid):
             return False  # Invalid artist MBID
         if not artist.name.strip():

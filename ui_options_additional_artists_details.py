@@ -9,7 +9,7 @@
 from PyQt6 import QtCore, QtGui, QtWidgets  # noqa: F401
 
 
-class Ui_AdditionalArtistsDetailsOptionsPage:
+class Ui_AdditionalArtistsDetailsOptionsPage(object):
     def setupUi(self, AdditionalArtistsDetailsOptionsPage):
         AdditionalArtistsDetailsOptionsPage.setObjectName("AdditionalArtistsDetailsOptionsPage")
         AdditionalArtistsDetailsOptionsPage.resize(561, 666)
@@ -33,9 +33,7 @@ class Ui_AdditionalArtistsDetailsOptionsPage:
         self.format_description.setWordWrap(True)
         self.format_description.setObjectName("format_description")
         self.verticalLayout.addWidget(self.format_description)
-        spacerItem = QtWidgets.QSpacerItem(
-            20, 6, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed
-        )
+        spacerItem = QtWidgets.QSpacerItem(20, 6, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         self.verticalLayout.addItem(spacerItem)
         self.process_section_title = QtWidgets.QLabel(parent=AdditionalArtistsDetailsOptionsPage)
         font = QtGui.QFont()
@@ -58,9 +56,7 @@ class Ui_AdditionalArtistsDetailsOptionsPage:
         self.cb_process_tracks.setObjectName("cb_process_tracks")
         self.verticalLayout_4.addWidget(self.cb_process_tracks)
         self.verticalLayout.addWidget(self.process_section_frame)
-        spacerItem1 = QtWidgets.QSpacerItem(
-            20, 6, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed
-        )
+        spacerItem1 = QtWidgets.QSpacerItem(20, 6, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         self.verticalLayout.addItem(spacerItem1)
         self.include_section_title = QtWidgets.QLabel(parent=AdditionalArtistsDetailsOptionsPage)
         font = QtGui.QFont()
@@ -93,9 +89,7 @@ class Ui_AdditionalArtistsDetailsOptionsPage:
         self.verticalLayout_6.addWidget(self.cb_area_subdivision)
         self.verticalLayout_5.addLayout(self.verticalLayout_6)
         self.verticalLayout.addWidget(self.include_section_frame)
-        spacerItem2 = QtWidgets.QSpacerItem(
-            20, 6, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed
-        )
+        spacerItem2 = QtWidgets.QSpacerItem(20, 6, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         self.verticalLayout.addItem(spacerItem2)
         self.cache_section_title = QtWidgets.QLabel(parent=AdditionalArtistsDetailsOptionsPage)
         font = QtGui.QFont()
@@ -159,9 +153,7 @@ class Ui_AdditionalArtistsDetailsOptionsPage:
         self.horizontalLayout_3 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_3.setContentsMargins(-1, 0, -1, -1)
         self.horizontalLayout_3.setObjectName("horizontalLayout_3")
-        spacerItem3 = QtWidgets.QSpacerItem(
-            40, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum
-        )
+        spacerItem3 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
         self.horizontalLayout_3.addItem(spacerItem3)
         self.b_import_cache = QtWidgets.QPushButton(parent=self.cache_section_frame)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Fixed)
@@ -201,9 +193,7 @@ class Ui_AdditionalArtistsDetailsOptionsPage:
         self.horizontalLayout_3.addWidget(self.b_delete_cache)
         self.verticalLayout_3.addLayout(self.horizontalLayout_3)
         self.verticalLayout.addWidget(self.cache_section_frame)
-        spacerItem4 = QtWidgets.QSpacerItem(
-            20, 6, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed
-        )
+        spacerItem4 = QtWidgets.QSpacerItem(20, 6, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         self.verticalLayout.addItem(spacerItem4)
         self.background_processing_title = QtWidgets.QLabel(parent=AdditionalArtistsDetailsOptionsPage)
         font = QtGui.QFont()
@@ -228,34 +218,24 @@ class Ui_AdditionalArtistsDetailsOptionsPage:
         self.horizontalLayout_4.setContentsMargins(-1, 0, -1, -1)
         self.horizontalLayout_4.setObjectName("horizontalLayout_4")
         self.background_processing_interval_label = QtWidgets.QLabel(parent=self.frame)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Preferred
-        )
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Preferred)
         sizePolicy.setHorizontalStretch(1)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.background_processing_interval_label.sizePolicy().hasHeightForWidth())
         self.background_processing_interval_label.setSizePolicy(sizePolicy)
         self.background_processing_interval_label.setObjectName("background_processing_interval_label")
         self.horizontalLayout_4.addWidget(self.background_processing_interval_label)
-        spacerItem5 = QtWidgets.QSpacerItem(
-            1, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum
-        )
+        spacerItem5 = QtWidgets.QSpacerItem(1, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
         self.horizontalLayout_4.addItem(spacerItem5)
         self.background_processing_interval = QtWidgets.QSpinBox(parent=self.frame)
-        self.background_processing_interval.setAlignment(
-            QtCore.Qt.AlignmentFlag.AlignRight
-            | QtCore.Qt.AlignmentFlag.AlignTrailing
-            | QtCore.Qt.AlignmentFlag.AlignVCenter
-        )
+        self.background_processing_interval.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignTrailing | QtCore.Qt.AlignmentFlag.AlignVCenter)
         self.background_processing_interval.setMinimum(20)
         self.background_processing_interval.setMaximum(600)
         self.background_processing_interval.setObjectName("background_processing_interval")
         self.horizontalLayout_4.addWidget(self.background_processing_interval)
         self.verticalLayout_2.addLayout(self.horizontalLayout_4)
         self.verticalLayout.addWidget(self.frame)
-        spacerItem6 = QtWidgets.QSpacerItem(
-            20, 1, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.MinimumExpanding
-        )
+        spacerItem6 = QtWidgets.QSpacerItem(20, 1, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.MinimumExpanding)
         self.verticalLayout.addItem(spacerItem6)
 
         self.retranslateUi(AdditionalArtistsDetailsOptionsPage)
@@ -275,9 +255,7 @@ class Ui_AdditionalArtistsDetailsOptionsPage:
 
     def retranslateUi(self, AdditionalArtistsDetailsOptionsPage):
         _translate = QtCore.QCoreApplication.translate
-        AdditionalArtistsDetailsOptionsPage.setWindowTitle(
-            _translate("AdditionalArtistsDetailsOptionsPage", "Additional Artists Details Options")
-        )
+        AdditionalArtistsDetailsOptionsPage.setWindowTitle(_translate("AdditionalArtistsDetailsOptionsPage", "Additional Artists Details Options"))
         self.page_title.setText(_translate("AdditionalArtistsDetailsOptionsPage", "page.title"))
         self.format_description.setText(_translate("AdditionalArtistsDetailsOptionsPage", "page.description"))
         self.process_section_title.setText(_translate("AdditionalArtistsDetailsOptionsPage", "section.process.title"))
@@ -286,21 +264,15 @@ class Ui_AdditionalArtistsDetailsOptionsPage:
         self.include_section_title.setText(_translate("AdditionalArtistsDetailsOptionsPage", "section.include.title"))
         self.include_section_text.setText(_translate("AdditionalArtistsDetailsOptionsPage", "section.include.text"))
         self.cb_area_county.setText(_translate("AdditionalArtistsDetailsOptionsPage", "option.include.county"))
-        self.cb_area_municipality.setText(
-            _translate("AdditionalArtistsDetailsOptionsPage", "option.include.municipality")
-        )
-        self.cb_area_subdivision.setText(
-            _translate("AdditionalArtistsDetailsOptionsPage", "option.include.subdivision")
-        )
+        self.cb_area_municipality.setText(_translate("AdditionalArtistsDetailsOptionsPage", "option.include.municipality"))
+        self.cb_area_subdivision.setText(_translate("AdditionalArtistsDetailsOptionsPage", "option.include.subdivision"))
         self.cache_section_title.setText(_translate("AdditionalArtistsDetailsOptionsPage", "section.cache.title"))
         self.cache_section_text.setText(_translate("AdditionalArtistsDetailsOptionsPage", "section.cache.text"))
         self.cb_use_cache.setText(_translate("AdditionalArtistsDetailsOptionsPage", "option.use_cache"))
         self.b_cache_status.setToolTip(_translate("AdditionalArtistsDetailsOptionsPage", "tooltip.button.status"))
         self.b_cache_status.setText(_translate("AdditionalArtistsDetailsOptionsPage", "button.status"))
         self.cache_file_label.setText(_translate("AdditionalArtistsDetailsOptionsPage", "label.cache_file"))
-        self.b_open_cache_directory.setToolTip(
-            _translate("AdditionalArtistsDetailsOptionsPage", "tooltip.button.open_cache_dir")
-        )
+        self.b_open_cache_directory.setToolTip(_translate("AdditionalArtistsDetailsOptionsPage", "tooltip.button.open_cache_dir"))
         self.b_open_cache_directory.setText(_translate("AdditionalArtistsDetailsOptionsPage", "..."))
         self.cb_save_artists.setText(_translate("AdditionalArtistsDetailsOptionsPage", "option.cache.save_artists"))
         self.b_import_cache.setToolTip(_translate("AdditionalArtistsDetailsOptionsPage", "tooltip.button.import"))
@@ -311,15 +283,7 @@ class Ui_AdditionalArtistsDetailsOptionsPage:
         self.b_edit_cache.setText(_translate("AdditionalArtistsDetailsOptionsPage", "button.edit"))
         self.b_delete_cache.setToolTip(_translate("AdditionalArtistsDetailsOptionsPage", "tooltip.button.delete"))
         self.b_delete_cache.setText(_translate("AdditionalArtistsDetailsOptionsPage", "button.delete"))
-        self.background_processing_title.setText(
-            _translate("AdditionalArtistsDetailsOptionsPage", "section.background_processing.title")
-        )
-        self.background_processing_label.setText(
-            _translate("AdditionalArtistsDetailsOptionsPage", "section.background_processing.text")
-        )
-        self.cb_use_background_processing.setText(
-            _translate("AdditionalArtistsDetailsOptionsPage", "option.cache.background_processing")
-        )
-        self.background_processing_interval_label.setText(
-            _translate("AdditionalArtistsDetailsOptionsPage", "option.cache.background_processing_interval")
-        )
+        self.background_processing_title.setText(_translate("AdditionalArtistsDetailsOptionsPage", "section.background_processing.title"))
+        self.background_processing_label.setText(_translate("AdditionalArtistsDetailsOptionsPage", "section.background_processing.text"))
+        self.cb_use_background_processing.setText(_translate("AdditionalArtistsDetailsOptionsPage", "option.cache.background_processing"))
+        self.background_processing_interval_label.setText(_translate("AdditionalArtistsDetailsOptionsPage", "option.cache.background_processing_interval"))

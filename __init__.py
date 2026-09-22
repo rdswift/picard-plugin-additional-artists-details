@@ -1014,6 +1014,7 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_INTERVAL] = self.ui.background_processing_interval.value()
         if SharedVars.use_persistent_cache:
             initialize_cache_db()
+            DataCache.clear_cache()
 
     def _save_artists_state_changed(self) -> None:
         self._set_button_states()
@@ -1152,29 +1153,38 @@ class CacheStatusPage(PicardDialog):
         self.ui.buttonBox.accepted.connect(self.close)
         self.ui.buttonBox.rejected.connect(self.close)
 
+        def md(text: str) -> str:
+            return f"- {text}"
+
+        notes: list[str] = []
+        if SharedVars.use_persistent_cache:
+            notes.append(md(SharedVars.api.tr(TxStrings.SESSION_CACHE_DISABLED)))
+        else:
+            notes.append(md(SharedVars.api.tr(TxStrings.DATABASE_CACHE_DISABLED)))
+
         # Get database cache counts and set orphans note
         if os.path.exists(DB_FILE) and os.path.isfile(DB_FILE):
             (artist, area) = DatabaseUtils.get_counts()
             parents, children = DatabaseUtils.get_orphan_areas_count()
             if parents > 0:
-                notes = SharedVars.api.tr(TxStrings.ORPHANS_MSG_TEXT) % (parents, children)
+                notes.append(md(SharedVars.api.tr(TxStrings.ORPHANS_MSG_TEXT) % (parents, children)))
             else:
-                notes = SharedVars.api.tr(TxStrings.NO_ORPHANS_MSG_TEXT)
+                notes.append(md(SharedVars.api.tr(TxStrings.NO_ORPHANS_MSG_TEXT)))
         else:
-            notes = SharedVars.api.tr(TxStrings.CACHE_MISSING_TEXT)
+            notes.append(md(SharedVars.api.tr(TxStrings.CACHE_MISSING_TEXT)))
             (artist, area) = (None, None)
 
         # Set note regarding background processing
         if SharedVars.background_processing_enabled:
             if SharedVars.background_processing_running:
-                notes += '\n' + SharedVars.api.tr(TxStrings.BACKGROUND_RUNNING_MSG_TEXT)
+                notes.append(md(SharedVars.api.tr(TxStrings.BACKGROUND_RUNNING_MSG_TEXT)))
             else:
-                notes += '\n' + SharedVars.api.tr(TxStrings.BACKGROUND_NOT_RUNNING_MSG_TEXT)
+                notes.append(md(SharedVars.api.tr(TxStrings.BACKGROUND_NOT_RUNNING_MSG_TEXT)))
         else:
-            notes += '\n' + SharedVars.api.tr(TxStrings.BACKGROUND_DISABLED_MSG_TEXT)
+            notes.append(md(SharedVars.api.tr(TxStrings.BACKGROUND_DISABLED_MSG_TEXT)))
 
         # Set database cache notes in display
-        self.ui.status_note.setText(notes)
+        self.ui.status_note.setText('\n'.join(notes))
 
         # Set database cache counts in display
         self.ui.database_artists_count.setText('n/a' if artist is None else f"{artist:,}")
