@@ -24,8 +24,9 @@ import threading
 from PyQt6 import QtWidgets
 from PyQt6.QtCore import (
     QStandardPaths,
-    Qt,
     QTimer,
+    Qt,
+    pyqtBoundSignal,
 )
 
 from picard.debug_opts import DebugOpt
@@ -50,7 +51,10 @@ except ImportError:
 from picard.webservice.api_helpers import MBAPIHelper
 
 from .cache import DataCache
-from .common import SharedVars
+from .common import (
+    FileFilters,
+    SharedVars,
+)
 from .const import (
     BASE_FILENAME,
     DB_DIR,
@@ -71,6 +75,7 @@ from .misc_utils import (
     format_bytes,
     is_valid_mbid,
 )
+from .signals import signaller
 from .translations import TxStrings
 from .ui_artists_cache_editor import Ui_AdditionalArtistsDetailsCacheEditor
 from .ui_cache_status import Ui_AdditionalArtistsDetailsCacheStatus
@@ -857,25 +862,32 @@ class ArtistDetailsPlugin:
         if not SharedVars.use_persistent_cache:
             SharedVars.api.logger.debug("Persistent cache disabled. " + text)
             SharedVars.background_processing_running = False
+            set_bg_action_state()
             return
 
         if not SharedVars.background_processing_enabled:
             SharedVars.api.logger.debug("Background processing disabled. " + text)
             SharedVars.background_processing_running = False
+            set_bg_action_state()
             return
 
         if DatabaseUtils.get_orphan_areas_count()[0] < 1:
             SharedVars.api.logger.debug("No orphan area records found. " + text)
             SharedVars.background_processing_running = False
+            set_bg_action_state()
             return
 
         SharedVars.background_processing_running = True
+        set_bg_action_state()
         area = DatabaseUtils.get_missing_parent_area()
         if area:
             QTimer.singleShot(
                 SharedVars.background_processing_interval * 1000,
                 partial(cls._get_single_area_info, area_id=area),
             )
+        else:
+            SharedVars.background_processing_running = False
+            set_bg_action_state()
 
     @classmethod
     def _get_single_area_info(cls, area_id: str) -> None:
@@ -969,20 +981,11 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         self.ui.b_open_cache_directory.setIcon(icon)
 
         self.ui.b_open_cache_directory.clicked.connect(self.open_cache_directory)
-        self.ui.b_edit_cache.clicked.connect(self.cache_edit)
-        self.ui.b_import_cache.clicked.connect(self.cache_import)
-        self.ui.b_export_cache.clicked.connect(self.cache_export)
         self.ui.b_delete_cache.clicked.connect(self.cache_delete)
-        self.ui.b_cache_status.clicked.connect(self.cache_status)
 
         self.ui.cb_use_cache.stateChanged.connect(self._use_cache_state_changed)
-        self.ui.cb_save_artists.stateChanged.connect(self._save_artists_state_changed)
 
         self.ui.cache_file.setText(DB_FILE)
-
-        self.filter_all = SharedVars.api.tr(TxStrings.FILTER_ALL) + " (*)"
-        self.filter_csv = SharedVars.api.tr(TxStrings.FILTER_CSV) + " (*.csv)"
-        self.filter_json = SharedVars.api.tr(TxStrings.FILTER_JSON) + " (*.json)"
 
         self.user_documents_dir = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)
 
@@ -1015,9 +1018,7 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         if SharedVars.use_persistent_cache:
             initialize_cache_db()
             DataCache.clear_cache()
-
-    def _save_artists_state_changed(self) -> None:
-        self._set_button_states()
+        set_actions_enabled_states()
 
     def _use_cache_state_changed(self) -> None:
         self._set_button_states()
@@ -1025,81 +1026,7 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
     def _set_button_states(self) -> None:
         cache_exists = os.path.isfile(DB_FILE)
         enabled = self.ui.cb_use_cache.isChecked()
-
-        self.ui.b_edit_cache.setEnabled(cache_exists and enabled and self.ui.cb_save_artists.isChecked())
-        self.ui.b_import_cache.setEnabled(cache_exists and enabled)
-        self.ui.b_export_cache.setEnabled(cache_exists and enabled)
         self.ui.b_delete_cache.setEnabled(cache_exists and not enabled)
-
-    def cache_import(self) -> None:
-        """Import from a cache file."""
-        filepath, filter = FileDialog.getOpenFileName(
-            parent=self,
-            directory=DEF_DIR,
-            # filter=self.filter_csv + ";;" + self.filter_json + ";;" + self.filter_all,
-            filter=self.filter_csv + ";;" + self.filter_json,
-            initialFilter=self.filter_csv,
-        )
-
-        if not filepath:
-            return
-
-        if filter == self.filter_json:
-            importer = DatabaseUtils.import_from_json
-        else:
-            importer = DatabaseUtils.import_from_csv
-
-        try:
-            importer(filename=filepath, save_artists=self.ui.cb_save_artists.isChecked())
-            QtWidgets.QMessageBox.information(self, None, SharedVars.api.tr(TxStrings.SUCCESS_IMPORT) % (filepath,))
-        except Exception as ex:
-            SharedVars.api.logger.error(str(ex))
-            QtWidgets.QMessageBox.critical(
-                self,
-                SharedVars.api.tr(TxStrings.ERR_MSG_TITLE),
-                SharedVars.api.tr(TxStrings.ERR_MSG_CACHE_IMPORT)
-                % (
-                    filepath,
-                    ex,
-                ),
-            )
-
-    def cache_export(self) -> None:
-        """Export to a cache file."""
-        filepath, _filter = FileDialog.getSaveFileName(
-            parent=self,
-            directory=os.path.join(DEF_DIR, BASE_FILENAME + '.csv'),
-            # filter=self.filter_csv + ";;" + self.filter_all,
-            filter=self.filter_csv,
-            initialFilter=self.filter_csv,
-        )
-        if not filepath:
-            return
-
-        try:
-            DatabaseUtils.export_to_csv(filename=filepath, save_artists=self.ui.cb_save_artists.isChecked())
-            QtWidgets.QMessageBox.information(self, None, SharedVars.api.tr(TxStrings.SUCCESS_EXPORT) % (filepath,))
-        except Exception as ex:
-            SharedVars.api.logger.error(str(ex))
-            QtWidgets.QMessageBox.critical(
-                self,
-                SharedVars.api.tr(TxStrings.ERR_MSG_TITLE),
-                SharedVars.api.tr(TxStrings.ERR_MSG_CACHE_EXPORT)
-                % (
-                    filepath,
-                    ex,
-                ),
-            )
-
-    def cache_edit(self) -> None:
-        """Edit the artists retained in the session cache and database file."""
-        editor = CacheEditorPage(self)
-        editor.exec()
-
-    def cache_status(self) -> None:
-        """Display the status of the session cache and database file."""
-        page = CacheStatusPage(self)
-        page.exec()
 
     def cache_delete(self) -> bool:
         if (
@@ -1445,20 +1372,139 @@ def initialize_cache_db() -> None:
     ArtistDetailsPlugin.process_orphan_areas()
 
 
+def show_db_not_active(parent=None):
+    QtWidgets.QMessageBox.warning(
+        parent,
+        SharedVars.api.tr(TxStrings.NOT_AVAILABLE_TITLE),
+        SharedVars.api.tr(TxStrings.NOT_AVAILABLE_TEXT),
+        QtWidgets.QMessageBox.StandardButton.Ok,
+        QtWidgets.QMessageBox.StandardButton.Ok,
+    )
+
+
+def import_cache(parent=None) -> None:
+    """Import from a cache file."""
+    filepath, filter = FileDialog.getOpenFileName(
+        parent=parent,
+        directory=DEF_DIR,
+        # filter=";;".join((FileFilters.CSV, FileFilters.JSON, FileFilters.ALL)),
+        filter=";;".join((FileFilters.CSV, FileFilters.JSON)),
+        initialFilter=FileFilters.CSV,
+    )
+
+    if not filepath:
+        return
+
+    if filter == FileFilters.JSON:
+        importer = DatabaseUtils.import_from_json
+    else:
+        importer = DatabaseUtils.import_from_csv
+
+    try:
+        importer(filename=filepath, save_artists=SharedVars.save_artists)
+        QtWidgets.QMessageBox.information(parent, None, SharedVars.api.tr(TxStrings.SUCCESS_IMPORT) % (filepath,))
+
+    except Exception as ex:
+        SharedVars.api.logger.error(str(ex))
+        QtWidgets.QMessageBox.critical(
+            parent,
+            SharedVars.api.tr(TxStrings.ERR_MSG_TITLE),
+            SharedVars.api.tr(TxStrings.ERR_MSG_CACHE_IMPORT)
+            % (
+                filepath,
+                ex,
+            ),
+        )
+
+
+def export_cache(parent=None) -> None:
+    """Export to a cache file."""
+    filepath, _filter = FileDialog.getSaveFileName(
+        parent=parent,
+        directory=os.path.join(DEF_DIR, BASE_FILENAME + '.csv'),
+        # filter=";;".join((FileFilters.CSV, FileFilters.ALL)),
+        filter=FileFilters.CSV,
+        initialFilter=FileFilters.CSV,
+    )
+    if not filepath:
+        return
+
+    try:
+        DatabaseUtils.export_to_csv(filename=filepath, save_artists=SharedVars.save_artists)
+        QtWidgets.QMessageBox.information(parent, None, SharedVars.api.tr(TxStrings.SUCCESS_EXPORT) % (filepath,))
+
+    except Exception as ex:
+        SharedVars.api.logger.error(str(ex))
+        QtWidgets.QMessageBox.critical(
+            parent,
+            SharedVars.api.tr(TxStrings.ERR_MSG_TITLE),
+            SharedVars.api.tr(TxStrings.ERR_MSG_CACHE_EXPORT)
+            % (
+                filepath,
+                ex,
+            ),
+        )
+
+
+def set_connection(signal: pyqtBoundSignal, callback):
+    """Signal connection setup helper.
+
+    Args:
+        signal (pyqtBoundSignal): Signal to which to connect.
+        callback (function): Function or method to connect.
+    """
+    # Remove connections to the signal prior to adding the new connection.
+    try:
+        signal.disconnect()     # Removes ALL connections
+        # while True:             # Removes only connections for this callback
+        #     signal.disconnect(callback)
+    except Exception:
+        pass
+
+    # Add the connection
+    signal.connect(callback)
+
+
 class BackgroundProcessingAction(BaseAction):
+    """Start cache missing parent retrieval background processing."""
     MENU = TxStrings.MENU
     TITLE = TxStrings.START_PROCESSING
 
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setEnabled(SharedVars.use_persistent_cache)
+        set_connection(signaller.set_background_processing_state, self.set_enabled_status)
+
+    def set_enabled_status(self, status: bool):
+        self.setEnabled(status)
+
     def callback(self, objs):
+        if not SharedVars.use_persistent_cache:
+            show_db_not_active(SharedVars.api.tagger.window)
+            return
+
         SharedVars.api.logger.debug("Background area retrieval processing started.")
         ArtistDetailsPlugin.process_orphan_areas()
 
 
 class CompactDatabaseAction(BaseAction):
+    """Compact the database file."""
     MENU = TxStrings.MENU
     TITLE = TxStrings.COMPACT_DATABASE
 
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setEnabled(SharedVars.use_persistent_cache)
+        set_connection(signaller.set_compact_database_state, self.set_enabled_status)
+
+    def set_enabled_status(self, status: bool):
+        self.setEnabled(status)
+
     def callback(self, objs):
+        if not SharedVars.use_persistent_cache:
+            show_db_not_active(SharedVars.api.tagger.window)
+            return
+
         if not os.path.exists(DB_FILE):
             QtWidgets.QMessageBox.warning(
                 SharedVars.api.tagger.window,
@@ -1490,13 +1536,95 @@ class CompactDatabaseAction(BaseAction):
         )
 
 
+class ImportCacheAction(BaseAction):
+    """Import cache items from a CSV or JSON export file."""
+    MENU = TxStrings.MENU
+    TITLE = TxStrings.IMPORT_CACHE
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setEnabled(SharedVars.use_persistent_cache)
+        set_connection(signaller.set_import_cache_state, self.set_enabled_status)
+
+    def set_enabled_status(self, status: bool):
+        self.setEnabled(status)
+
+    def callback(self, objs):
+        if not SharedVars.use_persistent_cache:
+            show_db_not_active(SharedVars.api.tagger.window)
+            return
+
+        import_cache(SharedVars.api.tagger.window)
+
+
+class ExportCacheAction(BaseAction):
+    """Export the cache database to a backup CSV file."""
+    MENU = TxStrings.MENU
+    TITLE = TxStrings.EXPORT_CACHE
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setEnabled(SharedVars.use_persistent_cache)
+        set_connection(signaller.set_export_cache_state, self.set_enabled_status)
+
+    def set_enabled_status(self, status: bool):
+        self.setEnabled(status)
+
+    def callback(self, objs):
+        if not SharedVars.use_persistent_cache:
+            show_db_not_active(SharedVars.api.tagger.window)
+            return
+
+        export_cache(SharedVars.api.tagger.window)
+
+
+class EditCacheAction(BaseAction):
+    """Edit the artists retained in the session cache and database file."""
+    MENU = TxStrings.MENU
+    TITLE = TxStrings.EDIT_CACHE
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setEnabled(SharedVars.use_persistent_cache)
+        set_connection(signaller.set_edit_cache_state, self.set_enabled_status)
+
+    def set_enabled_status(self, status: bool):
+        self.setEnabled(status)
+
+    def callback(self, objs):
+        if not SharedVars.use_persistent_cache:
+            show_db_not_active(SharedVars.api.tagger.window)
+            return
+
+        editor = CacheEditorPage(SharedVars.api.tagger.window)
+        editor.exec()
+
+
 class DisplayCacheStatusAction(BaseAction):
+    """Display the status of the in-memory and database caches."""
     MENU = TxStrings.MENU
     TITLE = TxStrings.DISPLAY_STATUS
 
     def callback(self, objs):
         page = CacheStatusPage(SharedVars.api.tagger.window)
         page.exec()
+
+
+def set_actions_enabled_states():
+    cache_enabled = SharedVars.use_persistent_cache
+    signaller.set_compact_database_state.emit(cache_enabled)
+    signaller.set_import_cache_state.emit(cache_enabled)
+    signaller.set_export_cache_state.emit(cache_enabled)
+    signaller.set_edit_cache_state.emit(cache_enabled)
+    set_bg_action_state()
+
+
+def set_bg_action_state():
+    signaller.set_background_processing_state.emit(
+        SharedVars.use_persistent_cache
+        and SharedVars.background_processing_enabled
+        and not SharedVars.background_processing_running
+    )
 
 
 def enable(api: PluginApi) -> None:
@@ -1520,12 +1648,10 @@ def enable(api: PluginApi) -> None:
 
     SharedVars.api = api
 
-    plugin = ArtistDetailsPlugin
-    # plugin.api = api
-    plugin.has_debug_if = hasattr(api.logger, 'debug_if')
+    FileFilters.initialize()
 
-    api.register_options_page(AdditionalArtistsDetailsOptionsPage)
-    api.register_album_post_removal_processor(plugin.remove_album)
+    plugin = ArtistDetailsPlugin
+    plugin.has_debug_if = hasattr(api.logger, 'debug_if')
 
     # Register the plugin to run at a high priority.
     api.register_album_metadata_processor(plugin.make_album_vars, priority=100)
@@ -1543,19 +1669,28 @@ def enable(api: PluginApi) -> None:
     else:
         api.logger.info("Persistent cache is diabled.")
 
-    # Register menu action to start background processing
-    api.register_tools_menu_action(BackgroundProcessingAction)
-
-    # Register menu action to compact the database
-    api.register_tools_menu_action(CompactDatabaseAction)
-
-    # Register menu action to display the cache status
+    # Register menu actions
     api.register_tools_menu_action(DisplayCacheStatusAction)
+    api.register_tools_menu_action(BackgroundProcessingAction)
+    api.register_tools_menu_action(CompactDatabaseAction)
+    api.register_tools_menu_action(ImportCacheAction)
+    api.register_tools_menu_action(ExportCacheAction)
+    api.register_tools_menu_action(EditCacheAction)
+
+    api.register_options_page(AdditionalArtistsDetailsOptionsPage)
+    api.register_album_post_removal_processor(plugin.remove_album)
+
+    set_actions_enabled_states()
 
 
 def disable():
     """Called when plugin is disabled."""
-    pass
+    # pass
+    signaller.set_background_processing_state.disconnect()
+    signaller.set_edit_cache_state.disconnect()
+    signaller.set_export_cache_state.disconnect()
+    signaller.set_import_cache_state.disconnect()
+    signaller.set_compact_database_state.disconnect()
 
 
 def migrate_settings(api: PluginApi) -> None:

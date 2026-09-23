@@ -18,6 +18,7 @@
 from picard.plugin3.api import PluginApi
 
 from .const import DEFAULT_BACKGROUND_PROCESSING_INTERVAL
+from .translations import TxStrings
 
 
 class SharedVars:
@@ -37,3 +38,14 @@ class SharedVars:
     """Interval in seconds between background processing tasks"""
     background_processing_running: bool = False
     """Indicates whether background processing is currently running"""
+
+
+class FileFilters:
+    """Standard file filter strings"""
+
+    @classmethod
+    def initialize(cls):
+        cls.ALL = SharedVars.api.tr(TxStrings.FILTER_ALL) + " (*)"
+        cls.CSV = SharedVars.api.tr(TxStrings.FILTER_CSV) + " (*.csv)"
+        cls.DB = SharedVars.api.tr(TxStrings.FILTER_DB) + " (*.db)"
+        cls.JSON = SharedVars.api.tr(TxStrings.FILTER_JSON) + " (*.json)"

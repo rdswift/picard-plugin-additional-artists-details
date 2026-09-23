@@ -49,6 +49,7 @@ class TxStrings:
     # File Filters
     FILTER_ALL = t_('ui.filter.all', "All files")
     FILTER_CSV = t_('ui.filter.csv', "CSV files")
+    FILTER_DB = t_('ui.filter.db', "Database files")
     FILTER_JSON = t_('ui.filter.json', "JSON files")
 
     # Cache Status Page
@@ -115,3 +116,10 @@ class TxStrings:
         "There was an error while compacting the database file.  Please see the log for details.",
     )
     DISPLAY_STATUS = t_("ui.action.display_cache_status.title", "Display the cache status")
+    IMPORT_CACHE = t_("ui.action.import_cache.title", "Import cache data")
+    EXPORT_CACHE = t_("ui.action.export_cache.title", "Export cache data")
+    EDIT_CACHE = t_("ui.action.edit_cache.title", "Edit cache data")
+
+    # Miscellaneous
+    NOT_AVAILABLE_TITLE = t_("ui.action.not_available.title", "Not Available")
+    NOT_AVAILABLE_TEXT = t_("ui.action.not_available.text", "That function is not currently available because the cache database is disabled.")

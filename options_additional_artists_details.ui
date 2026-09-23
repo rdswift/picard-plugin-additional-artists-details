@@ -258,22 +258,6 @@
           </property>
          </widget>
         </item>
-        <item>
-         <widget class="QPushButton" name="b_cache_status">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-          <property name="toolTip">
-           <string>tooltip.button.status</string>
-          </property>
-          <property name="text">
-           <string>button.status</string>
-          </property>
-         </widget>
-        </item>
        </layout>
       </item>
       <item>
@@ -340,72 +324,6 @@
            </size>
           </property>
          </spacer>
-        </item>
-        <item>
-         <widget class="QPushButton" name="b_import_cache">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-            <horstretch>1</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-          <property name="maximumSize">
-           <size>
-            <width>110</width>
-            <height>16777215</height>
-           </size>
-          </property>
-          <property name="toolTip">
-           <string>tooltip.button.import</string>
-          </property>
-          <property name="text">
-           <string>button.import</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="b_export_cache">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-            <horstretch>1</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-          <property name="maximumSize">
-           <size>
-            <width>110</width>
-            <height>16777215</height>
-           </size>
-          </property>
-          <property name="toolTip">
-           <string>tooltip.button.export</string>
-          </property>
-          <property name="text">
-           <string>button.export</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="b_edit_cache">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-            <horstretch>1</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-          <property name="maximumSize">
-           <size>
-            <width>110</width>
-            <height>16777215</height>
-           </size>
-          </property>
-          <property name="toolTip">
-           <string>tooltip.button.edit</string>
-          </property>
-          <property name="text">
-           <string>button.edit</string>
-          </property>
-         </widget>
         </item>
         <item>
          <widget class="QPushButton" name="b_delete_cache">
@@ -561,13 +479,9 @@
   <tabstop>cb_area_municipality</tabstop>
   <tabstop>cb_area_subdivision</tabstop>
   <tabstop>cb_use_cache</tabstop>
-  <tabstop>b_cache_status</tabstop>
   <tabstop>cache_file</tabstop>
   <tabstop>b_open_cache_directory</tabstop>
   <tabstop>cb_save_artists</tabstop>
-  <tabstop>b_import_cache</tabstop>
-  <tabstop>b_export_cache</tabstop>
-  <tabstop>b_edit_cache</tabstop>
   <tabstop>b_delete_cache</tabstop>
  </tabstops>
  <resources/>
