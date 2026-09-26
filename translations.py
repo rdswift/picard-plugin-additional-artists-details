@@ -75,9 +75,6 @@ class TxStrings:
     BACKGROUND_RUNNING_MSG_TEXT = t_(
         key='ui.notes.background_running.message', text="Background processing is enabled and currently running."
     )
-    BACKGROUND_NOT_RUNNING_MSG_TEXT = t_(
-        key='ui.notes.background_not_running.message', text="Background processing is enabled but currently not running."
-    )
 
     # Cache Editor Page
     CONFIRMATION_MSG_TITLE = t_('ui.remove.confirmation.title', "Confirm Removal")
@@ -105,7 +102,6 @@ class TxStrings:
 
     # Actions
     MENU = (t_("ui.action.sub_menu.title", "Additional Artists Details"),)
-    START_PROCESSING = t_("ui.action.background_processing.title", "Start background processing")
     COMPACT_DATABASE = t_("ui.action.compact_database.title", "Compact the database")
     COMPACT_DATABASE_OKAY = t_(
         "ui.action.compact_database_okay.text",
@@ -122,4 +118,7 @@ class TxStrings:
 
     # Miscellaneous
     NOT_AVAILABLE_TITLE = t_("ui.action.not_available.title", "Not Available")
-    NOT_AVAILABLE_TEXT = t_("ui.action.not_available.text", "That function is not currently available because the cache database is disabled.")
+    NOT_AVAILABLE_TEXT = t_(
+        "ui.action.not_available.text",
+        "That function is not currently available because the cache database is disabled.",
+    )

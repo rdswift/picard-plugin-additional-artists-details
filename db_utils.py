@@ -576,7 +576,9 @@ class DatabaseUtils:
         try:
             with cls.connect_to_database() as conn:
                 cursor = conn.cursor()
-                cursor.execute(cls._INSERT_AREA, (area.mbid, area.parent, area.name, area.country, AreaType.get_short(area.type)))
+                cursor.execute(
+                    cls._INSERT_AREA, (area.mbid, area.parent, area.name, area.country, AreaType.get_short(area.type))
+                )
                 conn.commit()
 
         except sqlite3.Error as ex:
@@ -780,7 +782,7 @@ class DatabaseUtils:
             str: MBID of the missing record, or empty string if no missing records.
         """
         if not os.path.exists(DB_FILE):
-            return ''   # Database does not exist
+            return ''  # Database does not exist
 
         try:
             with cls.connect_to_database() as conn:

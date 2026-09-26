@@ -24,8 +24,8 @@ import threading
 from PyQt6 import QtWidgets
 from PyQt6.QtCore import (
     QStandardPaths,
-    QTimer,
     Qt,
+    QTimer,
     pyqtBoundSignal,
 )
 
@@ -60,6 +60,7 @@ from .const import (
     DB_DIR,
     DB_FILE,
     DEF_DIR,
+    DEFAULT_BACKGROUND_PROCESSING_INTERVAL,
     RELATIONSHIP_TYPE_PART_OF,
     USER_GUIDE_URL,
 )
@@ -350,9 +351,6 @@ class ArtistDetailsPlugin:
             if count:
                 return
 
-        # Start / restart orphan area processing
-        cls.process_orphan_areas()
-
     @classmethod
     def remove_album(cls, _api: PluginApi, album: Album) -> None:
         """Remove the album from the albums processing dictionary.
@@ -521,8 +519,7 @@ class ArtistDetailsPlugin:
             if not value or key == 'id':
                 continue
 
-            # if key in {'area', 'begin-area', 'end-area'}:
-            if key.endswith('area'):
+            if key in {'area', 'begin-area', 'end-area'}:
                 country, location = cls._drill_area(value)
                 if country:
                     _set_item(key.replace('area', 'country'), country)
@@ -858,27 +855,14 @@ class ArtistDetailsPlugin:
     @classmethod
     def process_orphan_areas(cls) -> None:
         """Retrieve missing area parents in the background."""
-        text = "Background processing halted."
-        if not SharedVars.use_persistent_cache:
-            SharedVars.api.logger.debug("Persistent cache disabled. " + text)
-            SharedVars.background_processing_running = False
-            set_bg_action_state()
+        if SharedVars.background_processing_running:
             return
 
-        if not SharedVars.background_processing_enabled:
-            SharedVars.api.logger.debug("Background processing disabled. " + text)
-            SharedVars.background_processing_running = False
-            set_bg_action_state()
-            return
-
-        if DatabaseUtils.get_orphan_areas_count()[0] < 1:
-            SharedVars.api.logger.debug("No orphan area records found. " + text)
-            SharedVars.background_processing_running = False
-            set_bg_action_state()
+        if not SharedVars.use_persistent_cache or not SharedVars.background_processing_enabled:
+            SharedVars.api.logger.debug("Background processing disabled.")
             return
 
         SharedVars.background_processing_running = True
-        set_bg_action_state()
         area = DatabaseUtils.get_missing_parent_area()
         if area:
             QTimer.singleShot(
@@ -887,7 +871,10 @@ class ArtistDetailsPlugin:
             )
         else:
             SharedVars.background_processing_running = False
-            set_bg_action_state()
+            QTimer.singleShot(
+                max(SharedVars.background_processing_interval, DEFAULT_BACKGROUND_PROCESSING_INTERVAL) * 1000,
+                cls.process_orphan_areas,
+            )
 
     @classmethod
     def _get_single_area_info(cls, area_id: str) -> None:
@@ -906,9 +893,11 @@ class ArtistDetailsPlugin:
 
     @classmethod
     def _single_area_submission_handler(cls, document, _reply, error, area=None) -> None:
+        SharedVars.background_processing_running = False
+
         if error:
-            SharedVars.api.logger.error("Area '%s' information retrieval error.  Background processing halted.", area)
-            SharedVars.background_processing_running = False
+            SharedVars.api.logger.error("Area '%s' information retrieval error.", area)
+            cls.process_orphan_areas()
             return
 
         SharedVars.api.logger.debug('Retrieved area ID %s from MusicBrainz.', area)
@@ -918,8 +907,8 @@ class ArtistDetailsPlugin:
         area_info = area_dict_to_entity(new_id, info)
 
         if not info or not new_id or new_id != area or area_info is None:
-            SharedVars.api.logger.error("Area '%s' information invalid.  Background processing halted.", area)
-            SharedVars.background_processing_running = False
+            SharedVars.api.logger.error("Area '%s' information invalid.", area)
+            cls.process_orphan_areas()
             return
 
         parent_id = '' if info['type'] == AreaType.COUNTRY.mbid else cls._get_area_parent(document)
@@ -959,7 +948,6 @@ class ArtistDetailsPlugin:
 
         except Exception as ex:
             SharedVars.api.logger.error("Error processing area '%s' information: %s", area, ex)
-            return
 
         # Set up requests for missing ancestors as required
         cls.process_orphan_areas()
@@ -984,6 +972,7 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         self.ui.b_delete_cache.clicked.connect(self.cache_delete)
 
         self.ui.cb_use_cache.stateChanged.connect(self._use_cache_state_changed)
+        self.ui.cb_use_background_processing.stateChanged.connect(self._use_bg_processing_state_changed)
 
         self.ui.cache_file.setText(DB_FILE)
 
@@ -996,8 +985,7 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         self.ui.cb_area_municipality.setChecked(SharedVars.api.plugin_config[OPT_AREA_MUNICIPALITY])
         self.ui.cb_area_subdivision.setChecked(SharedVars.api.plugin_config[OPT_AREA_SUBDIVISION])
         self.ui.cb_use_cache.setChecked(SharedVars.api.plugin_config[OPT_USE_CACHE])
-        self.save_artists = SharedVars.api.plugin_config[OPT_SAVE_ARTISTS_IN_CACHE]
-        self.ui.cb_save_artists.setChecked(self.save_artists)
+        self.ui.cb_save_artists.setChecked(SharedVars.api.plugin_config[OPT_SAVE_ARTISTS_IN_CACHE])
         self.ui.cb_use_background_processing.setChecked(SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_AREAS])
         self.ui.background_processing_interval.setValue(SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_INTERVAL])
         self._set_button_states()
@@ -1012,9 +1000,10 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         SharedVars.api.plugin_config[OPT_USE_CACHE] = SharedVars.use_persistent_cache
         SharedVars.save_artists = self.ui.cb_save_artists.isChecked()
         SharedVars.api.plugin_config[OPT_SAVE_ARTISTS_IN_CACHE] = SharedVars.save_artists
-        self.save_artists = SharedVars.save_artists
-        SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_AREAS] = self.ui.cb_use_background_processing.isChecked()
-        SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_INTERVAL] = self.ui.background_processing_interval.value()
+        SharedVars.background_processing_enabled = self.ui.cb_use_background_processing.isChecked()
+        SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_AREAS] = SharedVars.background_processing_enabled
+        SharedVars.background_processing_interval = self.ui.background_processing_interval.value()
+        SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_INTERVAL] = SharedVars.background_processing_interval
         if SharedVars.use_persistent_cache:
             initialize_cache_db()
             DataCache.clear_cache()
@@ -1023,10 +1012,18 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
     def _use_cache_state_changed(self) -> None:
         self._set_button_states()
 
+    def _use_bg_processing_state_changed(self) -> None:
+        self._set_button_states()
+
     def _set_button_states(self) -> None:
         cache_exists = os.path.isfile(DB_FILE)
         enabled = self.ui.cb_use_cache.isChecked()
+        bg_enabled = self.ui.cb_use_background_processing.isChecked()
+
+        self.ui.cb_save_artists.setEnabled(enabled)
         self.ui.b_delete_cache.setEnabled(cache_exists and not enabled)
+        self.ui.cb_use_background_processing.setEnabled(enabled)
+        self.ui.background_processing_interval.setEnabled(enabled and bg_enabled)
 
     def cache_delete(self) -> bool:
         if (
@@ -1101,12 +1098,8 @@ class CacheStatusPage(PicardDialog):
             notes.append(md(SharedVars.api.tr(TxStrings.CACHE_MISSING_TEXT)))
             (artist, area) = (None, None)
 
-        # Set note regarding background processing
         if SharedVars.background_processing_enabled:
-            if SharedVars.background_processing_running:
-                notes.append(md(SharedVars.api.tr(TxStrings.BACKGROUND_RUNNING_MSG_TEXT)))
-            else:
-                notes.append(md(SharedVars.api.tr(TxStrings.BACKGROUND_NOT_RUNNING_MSG_TEXT)))
+            notes.append(md(SharedVars.api.tr(TxStrings.BACKGROUND_RUNNING_MSG_TEXT)))
         else:
             notes.append(md(SharedVars.api.tr(TxStrings.BACKGROUND_DISABLED_MSG_TEXT)))
 
@@ -1353,6 +1346,8 @@ class CacheEditorPage(PicardDialog):
 
 def initialize_cache_db() -> None:
     """Initialize the cache database for the plugin."""
+    if not SharedVars.use_persistent_cache:
+        return
     if os.path.exists(DB_FILE):
         DatabaseUtils.update_database_schema()
     else:
@@ -1369,7 +1364,8 @@ def initialize_cache_db() -> None:
             except OSError as e:
                 SharedVars.api.logger.warning("Error removing old cache file: %s", e)
 
-    ArtistDetailsPlugin.process_orphan_areas()
+    if SharedVars.background_processing_enabled and not SharedVars.background_processing_running:
+        ArtistDetailsPlugin.process_orphan_areas()
 
 
 def show_db_not_active(parent=None):
@@ -1455,7 +1451,7 @@ def set_connection(signal: pyqtBoundSignal, callback):
     """
     # Remove connections to the signal prior to adding the new connection.
     try:
-        signal.disconnect()     # Removes ALL connections
+        signal.disconnect()  # Removes ALL connections
         # while True:             # Removes only connections for this callback
         #     signal.disconnect(callback)
     except Exception:
@@ -1465,30 +1461,9 @@ def set_connection(signal: pyqtBoundSignal, callback):
     signal.connect(callback)
 
 
-class BackgroundProcessingAction(BaseAction):
-    """Start cache missing parent retrieval background processing."""
-    MENU = TxStrings.MENU
-    TITLE = TxStrings.START_PROCESSING
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setEnabled(SharedVars.use_persistent_cache)
-        set_connection(signaller.set_background_processing_state, self.set_enabled_status)
-
-    def set_enabled_status(self, status: bool):
-        self.setEnabled(status)
-
-    def callback(self, objs):
-        if not SharedVars.use_persistent_cache:
-            show_db_not_active(SharedVars.api.tagger.window)
-            return
-
-        SharedVars.api.logger.debug("Background area retrieval processing started.")
-        ArtistDetailsPlugin.process_orphan_areas()
-
-
 class CompactDatabaseAction(BaseAction):
     """Compact the database file."""
+
     MENU = TxStrings.MENU
     TITLE = TxStrings.COMPACT_DATABASE
 
@@ -1538,6 +1513,7 @@ class CompactDatabaseAction(BaseAction):
 
 class ImportCacheAction(BaseAction):
     """Import cache items from a CSV or JSON export file."""
+
     MENU = TxStrings.MENU
     TITLE = TxStrings.IMPORT_CACHE
 
@@ -1559,6 +1535,7 @@ class ImportCacheAction(BaseAction):
 
 class ExportCacheAction(BaseAction):
     """Export the cache database to a backup CSV file."""
+
     MENU = TxStrings.MENU
     TITLE = TxStrings.EXPORT_CACHE
 
@@ -1580,6 +1557,7 @@ class ExportCacheAction(BaseAction):
 
 class EditCacheAction(BaseAction):
     """Edit the artists retained in the session cache and database file."""
+
     MENU = TxStrings.MENU
     TITLE = TxStrings.EDIT_CACHE
 
@@ -1602,6 +1580,7 @@ class EditCacheAction(BaseAction):
 
 class DisplayCacheStatusAction(BaseAction):
     """Display the status of the in-memory and database caches."""
+
     MENU = TxStrings.MENU
     TITLE = TxStrings.DISPLAY_STATUS
 
@@ -1616,15 +1595,6 @@ def set_actions_enabled_states():
     signaller.set_import_cache_state.emit(cache_enabled)
     signaller.set_export_cache_state.emit(cache_enabled)
     signaller.set_edit_cache_state.emit(cache_enabled)
-    set_bg_action_state()
-
-
-def set_bg_action_state():
-    signaller.set_background_processing_state.emit(
-        SharedVars.use_persistent_cache
-        and SharedVars.background_processing_enabled
-        and not SharedVars.background_processing_running
-    )
 
 
 def enable(api: PluginApi) -> None:
@@ -1641,7 +1611,7 @@ def enable(api: PluginApi) -> None:
     api.plugin_config.register_option(OPT_USE_CACHE, True)
     api.plugin_config.register_option(OPT_SAVE_ARTISTS_IN_CACHE, True)
     api.plugin_config.register_option(OPT_BACKGROUND_FETCH_AREAS, False)
-    api.plugin_config.register_option(OPT_BACKGROUND_FETCH_INTERVAL, 60)
+    api.plugin_config.register_option(OPT_BACKGROUND_FETCH_INTERVAL, DEFAULT_BACKGROUND_PROCESSING_INTERVAL)
 
     # Migrate settings from 2.x version if available
     migrate_settings(api)
@@ -1671,7 +1641,6 @@ def enable(api: PluginApi) -> None:
 
     # Register menu actions
     api.register_tools_menu_action(DisplayCacheStatusAction)
-    api.register_tools_menu_action(BackgroundProcessingAction)
     api.register_tools_menu_action(CompactDatabaseAction)
     api.register_tools_menu_action(ImportCacheAction)
     api.register_tools_menu_action(ExportCacheAction)
@@ -1685,12 +1654,7 @@ def enable(api: PluginApi) -> None:
 
 def disable():
     """Called when plugin is disabled."""
-    # pass
-    signaller.set_background_processing_state.disconnect()
-    signaller.set_edit_cache_state.disconnect()
-    signaller.set_export_cache_state.disconnect()
-    signaller.set_import_cache_state.disconnect()
-    signaller.set_compact_database_state.disconnect()
+    pass
 
 
 def migrate_settings(api: PluginApi) -> None:
