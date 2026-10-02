@@ -40,17 +40,17 @@ from .misc_utils import (
 class DatabaseUtils:
     """Utility functions for working with the plugin's database."""
 
-    DB_VERSION: int = 2
+    DB_VERSION: int = 3
 
     _INSERT_ARTIST: str = (
         "INSERT OR REPLACE INTO artists (mbid, name, sort, type, gender, area, begin, begin_area, "
-        "end, end_area, disambiguation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        "end, end_area, disambiguation, website) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
 
     _INSERT_AREA: str = "INSERT OR REPLACE INTO areas (mbid, parent, name, country, type) VALUES (?, ?, ?, ?, ?)"
 
     _SELECT_ARTIST: str = (
-        "SELECT mbid, name, sort, type, gender, area, begin, begin_area, end, end_area, disambiguation FROM artists"
+        "SELECT mbid, name, sort, type, gender, area, begin, begin_area, end, end_area, disambiguation, website FROM artists"
     )
 
     _SELECT_AREA: str = "SELECT mbid, parent, name, country, type FROM areas"
@@ -66,6 +66,29 @@ class DatabaseUtils:
             ex (Exception): Exception raised.
         """
         SharedVars.api.logger.error(f"Error encountered in '{fcn}': {ex}")
+
+    @classmethod
+    def _execute_non_query(cls, sql: str, params: tuple = ()) -> bool:
+        """Execute a non-query SQL command (e.g., INSERT, UPDATE, DELETE).
+
+        Args:
+            sql (str): The SQL command to execute.
+            params (tuple): Parameters for the SQL command.
+
+        Returns:
+            bool: True if the command was executed successfully, False otherwise.
+        """
+        try:
+            with cls.connect_to_database() as conn:
+                cursor = conn.cursor()
+                cursor.execute(sql, params)
+                conn.commit()
+                cursor.close()
+            return True
+
+        except sqlite3.Error as ex:
+            cls.log_error(sql, ex)
+            return False
 
     @classmethod
     def update_database_schema(cls) -> None:
@@ -103,25 +126,15 @@ class DatabaseUtils:
             cls.compact_database()
 
         # Update for version 3
-        # # Example of a schema update for version 3
-        # if current_version < 3:
-        #     if SharedVars.api:
-        #         SharedVars.api.logger.info("Updating database schema to version 3.")
-
-        #     try:
-        #         with cls.connect_to_database() as conn:
-        #             cursor = conn.cursor()
-        #             cursor.execute("ALTER TABLE artists ADD COLUMN new_column TEXT;")
-        #             conn.commit()
-        #         cursor.close()
-
-        #     except sqlite3.Error as ex:
-        #         cls.log_error(fcn, ex)
-        #         return
-
-        #     current_version = 3  # Update current_version after applying the update
-        #     cls.set_db_version(3)
-        #     cls.compact_database()
+        #  - Add a new column 'website' to the 'artists' table
+        if current_version < 3:
+            if SharedVars.api:
+                SharedVars.api.logger.info("Updating database schema to version 3.")
+            sql = "ALTER TABLE artists ADD COLUMN website TEXT;"
+            if cls._execute_non_query(sql):
+                current_version = 3  # Update current_version after applying the update
+                cls.set_db_version(3)
+                cls.compact_database()
 
     @classmethod
     def get_db_version(cls) -> int:
@@ -150,6 +163,7 @@ class DatabaseUtils:
         try:
             with cls.connect_to_database() as conn:
                 cursor = conn.cursor()
+                cursor.execute("DELETE FROM db_version;")
                 cursor.execute("INSERT OR REPLACE INTO db_version (version) VALUES (?);", (version,))
                 conn.commit()
         except sqlite3.Error as ex:
@@ -315,6 +329,7 @@ class DatabaseUtils:
                             artist.get('end', ''),
                             artist.get('end-area', ''),
                             artist.get('disambiguation', ''),
+                            artist.get('website', ''),
                         ),
                     )
                 conn.commit()
@@ -400,8 +415,10 @@ class DatabaseUtils:
                     #    9. End date for the Artist
                     #   10. MBID of the end area
                     #   11. Disambiguation comment
+                    #   12. Website URL of the artist (added in version 3)
                     if len(row) < 12:
                         continue  # Skip artist rows that don't have enough columns
+                    row.append('')  # Ensure there is a 12th column for the website URL
                     if not is_valid_mbid(row[1]):
                         continue  # Invalid artist MBID
                     if not row[2].strip():
@@ -418,7 +435,7 @@ class DatabaseUtils:
                         continue  # Invalid area MBID
                     cursor.execute(
                         cls._INSERT_ARTIST,
-                        (row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11]),
+                        (row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11], row[12]),
                     )
 
             conn.commit()
@@ -489,6 +506,7 @@ class DatabaseUtils:
                             "End date for the Artist",
                             "MBID of the end area",
                             "Disambiguation comment",
+                            "Website URL(s) of the artist",
                         ]
                     )
                     cursor.execute(cls._SELECT_ARTIST + " ORDER BY sort ASC;")
@@ -634,6 +652,7 @@ class DatabaseUtils:
                         artist.end,
                         artist.end_area,
                         artist.disambiguation,
+                        artist.website,
                     ),
                 )
                 conn.commit()
@@ -678,6 +697,7 @@ class DatabaseUtils:
             end=row[8],
             end_area=row[9],
             disambiguation=row[10],
+            website=row[11],
         )
 
     @staticmethod

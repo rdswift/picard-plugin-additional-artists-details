@@ -68,6 +68,7 @@ from .db_utils import DatabaseUtils
 from .entities import (
     AreaEntity,
     AreaType,
+    ArtistEntity,
 )
 from .misc_utils import (
     area_dict_to_entity,
@@ -133,6 +134,9 @@ class CustomHelper(MBAPIHelper):
         Returns:
             PendingRequest: Requested task object.
         """
+        if inc is None:
+            inc = ['url-rels']
+
         return self._get_by_id(
             ARTIST,
             mbid,
@@ -184,10 +188,13 @@ class CustomHelper(MBAPIHelper):
 
 
 @dataclass
-class MetadataPair:
-    """Track metadata pair"""
+class MetadataGroup:
+    """Track metadata group"""
 
-    artists: set
+    track_id: str
+    """MBID of the track"""
+
+    artists: list[str]
     """MBIDs of artists on the track"""
 
     target: Metadata
@@ -295,16 +302,17 @@ class ArtistDetailsPlugin:
             cls.albums[album_id] = {ALBUM_ARTISTS: set(), TRACKS: []}
 
     @classmethod
-    def _add_target(cls, album_id: str, artists: set, target_metadata: Metadata) -> None:
+    def _add_target(cls, album_id: str, track_id: str, artists: list[str], target_metadata: Metadata) -> None:
         """Add a metadata target to update for an album.
 
         Args:
             album_id (str): MBID of the album.
-            artists (set): Set of artists to include.
+            track_id (str): MBID of the track.
+            artists (list[str]): List of artists to include.
             target_metadata (Metadata): Target metadata to update.
         """
         cls._make_empty_target(album_id)
-        cls.albums[album_id][TRACKS].append(MetadataPair(artists, target_metadata))
+        cls.albums[album_id][TRACKS].append(MetadataGroup(track_id, artists, target_metadata))
 
     @classmethod
     def _remove_album(cls, album_id: str) -> None:
@@ -390,9 +398,65 @@ class ArtistDetailsPlugin:
             track_metadata (Metadata): Metadata object to update.
         """
         album = track.album
-        for artist in cls.albums[album.id][ALBUM_ARTISTS]:
-            cls._set_artist_metadata(track_metadata, artist)
-        return
+        cls._add_target(album.id, track.id, [], track_metadata)
+
+    @classmethod
+    def _get_artist_vars(cls, artists: list[str]) -> list[tuple[str, list]]:
+        """Get the artist information for the specified list of MBIDs.
+
+        Args:
+            artists (list[str]): List of artist MBIDs to retrieve.
+        """
+        if not artists:
+            return []
+
+        begin_dates = []
+        begin_locations = []
+        begin_country = []
+        end_dates = []
+        end_locations = []
+        end_country = []
+        locations = []
+        countries = []
+        disambiguations = []
+        names = []
+        sort_names = []
+        genders = []
+        types = []
+        websites = []
+        for artist_id in artists:
+            artist_info: ArtistEntity = DataCache.get_artist_info(artist_id)
+            names.append(artist_info.name if artist_info else '')
+            sort_names.append(artist_info.sort if artist_info else '')
+            types.append(artist_info.type if artist_info else '')
+            genders.append(artist_info.gender if artist_info else '')
+            begin_dates.append(artist_info.begin if artist_info else '')
+            begin_locations.append(cls._drill_area(artist_info.begin_area)[1] if artist_info else '')
+            begin_country.append(cls._drill_area(artist_info.begin_area)[0] if artist_info else '')
+            end_dates.append(artist_info.end if artist_info else '')
+            end_locations.append(cls._drill_area(artist_info.end_area)[1] if artist_info else '')
+            end_country.append(cls._drill_area(artist_info.end_area)[0] if artist_info else '')
+            locations.append(cls._drill_area(artist_info.area)[1] if artist_info else '')
+            countries.append(cls._drill_area(artist_info.area)[0] if artist_info else '')
+            disambiguations.append(artist_info.disambiguation if artist_info else '')
+            websites.append(artist_info.website if artist_info else '')
+
+        return [
+            ('names', names),
+            ('sort_names', sort_names),
+            ('types', types),
+            ('genders', genders),
+            ('begin_dates', begin_dates),
+            ('begin_locations', begin_locations),
+            ('begin_countries', begin_country),
+            ('end_dates', end_dates),
+            ('end_locations', end_locations),
+            ('end_countries', end_country),
+            ('locations', locations),
+            ('countries', countries),
+            ('disambiguations', disambiguations),
+            ('websites', websites),
+        ]
 
     @classmethod
     def make_track_vars(
@@ -416,7 +480,7 @@ class ArtistDetailsPlugin:
             cls._set_track_with_no_artists(track, track_metadata)
             return
 
-        artists = set()
+        artists = []
         source_type = 'track'
         album = track.album
         # Test for valid metadata node.
@@ -426,7 +490,7 @@ class ArtistDetailsPlugin:
             for artist_credit in track_node['artist-credit']:
                 if 'artist' in artist_credit:
                     if 'id' in artist_credit['artist']:
-                        artists.add(artist_credit['artist']['id'])
+                        artists.append(artist_credit['artist']['id'])
                 else:
                     # No 'artist' specified.  Log as an error.
                     cls._metadata_error(album.id, 'artist-credit.artist', source_type)
@@ -438,20 +502,21 @@ class ArtistDetailsPlugin:
             cls._set_track_with_no_artists(track, track_metadata)
             return
 
-        cls._artist_processing(artists, album, track_metadata, 'Track')
+        cls._artist_processing(artists, album, track_metadata, 'Track', track.id)
 
     @classmethod
     def _artist_processing(
         cls,
-        artists: set[str],
+        artists: list[str],
         album: Album,
         destination_metadata: Metadata,
         source_type: str,
+        track_id: str = '',
     ) -> None:
         """Retrieves the information for each artist not already processed.
 
         Args:
-            artists (set): Set of artist MBIDs to process.
+            artists (list[str]): List of artist MBIDs to process.
             album (Album): Album object to use for the processing.
             destination_metadata (Metadata): Metadata object to update with the new variables.
             source_type (str): Source type ('album' or 'track') for logging messages.
@@ -464,7 +529,7 @@ class ArtistDetailsPlugin:
             else:
                 cls._debug_logger(f"{source_type} artist ID {temp_id} information available from cache.")
 
-        cls._add_target(album.id, artists, destination_metadata)
+        cls._add_target(album.id, track_id, artists, destination_metadata)
         cls._save_artist_metadata(album)
 
     @classmethod
@@ -486,14 +551,34 @@ class ArtistDetailsPlugin:
             SharedVars.api.logger.error("No metadata targets found for album '%s'", album_id)
             return False
 
+        album_artists = []
+        for artist in album.get_album_artists():
+            if artist.id not in album_artists:
+                album_artists.append(artist.id)
+
+        album_vars = cls._get_artist_vars(album_artists)
+
+        # Create `~artist_{id}_{key}` variables for all artists for the album, including album artists and track artists
         for item in cls.albums[album_id][TRACKS]:
-            item: MetadataPair
+            item: MetadataGroup
             # Add album artists to track so they are available in the metadata
-            artists = cls.albums[album_id][ALBUM_ARTISTS].copy().union(item.artists)
-            destination_metadata = item.target
+            artists = cls.albums[album_id][ALBUM_ARTISTS].copy().union(set(item.artists))
             for artist in artists:
                 if artist in cls.cache_requests['artist'] or DataCache.get_artist_info(artist) is not None:
-                    cls._set_artist_metadata(destination_metadata, artist)
+                    cls._set_artist_metadata(item.target, artist)
+
+            for key, value in album_vars:
+                item.target[f'~aad_albumartists_{key}'] = value
+
+        # Create `~aad_artists_{key}` and `~aad_albumartists_{key}` variables for all tracks in the album
+        for item in cls.albums[album_id][TRACKS]:
+            item: MetadataGroup
+            if not item.track_id:
+                continue
+
+            values = cls._get_artist_vars(item.artists)
+            for key, value in values:
+                item.target[f'~aad_artists_{key}'] = value
 
         return True
 
@@ -506,7 +591,7 @@ class ArtistDetailsPlugin:
             artist_id (str): MBID of the artist to update.
         """
 
-        def _set_item(key: str, value: str):
+        def _set_item(key: str, value: str | list) -> None:
             key_ = f"~artist_{artist_id}_{key.replace('-', '_')}"
             destination_metadata[key_] = value
 
@@ -519,12 +604,16 @@ class ArtistDetailsPlugin:
             if not value or key == 'id':
                 continue
 
-            if key in {'area', 'begin-area', 'end-area'}:
+            if key == 'website':
+                _set_item(key, value.split('; '))
+
+            elif key in {'area', 'begin-area', 'end-area'}:
                 country, location = cls._drill_area(value)
                 if country:
                     _set_item(key.replace('area', 'country'), country)
                 if location:
                     _set_item(key.replace('area', 'location'), location)
+
             else:
                 _set_item(key, value)
 
@@ -551,7 +640,7 @@ class ArtistDetailsPlugin:
             task_id=task_id,
             description=f"Get info for artist: {artist_id}",
             timeout=10.0,
-            request_factory=lambda: helper.get_artist_by_id(artist_id, handler),
+            request_factory=lambda: helper.get_artist_by_id(artist_id, handler, inc=['url-rels']),
             blocking=True,
         )
 
@@ -764,9 +853,11 @@ class ArtistDetailsPlugin:
         rel_direction = area_relation.get('direction', '')
         if rel_type != RELATIONSHIP_TYPE_PART_OF or rel_direction != 'forward':
             return None
+
         area_info = cls._parse_area(area_relation.get('area', {}))
         if not area_info or not area_info.get('id', ''):
             return None
+
         return AreaRelationship(
             id=area_info.get('id', ''),
             name=area_info.get('name', ''),
@@ -1369,6 +1460,7 @@ def initialize_cache_db() -> None:
 
 
 def show_db_not_active(parent=None):
+    """Show a warning message that the database is not active."""
     QtWidgets.QMessageBox.warning(
         parent,
         SharedVars.api.tr(TxStrings.NOT_AVAILABLE_TITLE),

@@ -137,6 +137,9 @@ class ArtistEntity:
     disambiguation: str = ''
     """Disambiguation comment for the artist."""
 
+    website: str = ''
+    """Website URL of the artist."""
+
 
 @dataclass
 class AreaEntity:

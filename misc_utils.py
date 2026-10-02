@@ -17,6 +17,7 @@
 
 import re
 
+from .const import RELATIONSHIP_TYPE_OFFICIAL_HOMEPAGE
 from .entities import (
     AreaEntity,
     ArtistEntity,
@@ -84,6 +85,26 @@ def artist_dict_to_entity(mbid: str, info: dict) -> ArtistEntity | None:
     if not sort_.strip():
         return None  # Missing sort name
 
+    # # Include for debugging during development.
+    # import json
+    # import os
+    # from picard.util import make_filename_from_title
+    # from .const import DEF_DIR
+    # text = json.dumps(info, indent=4)
+    # filename = os.path.join(DEF_DIR, make_filename_from_title(f'Artist={name_}.json'))
+    # with open(filename, 'w', encoding='utf8') as f:
+    #     f.write(text)
+
+    websites = []
+    for rel in info.get('relations', []):
+        rel: dict
+        if (
+            rel.get('type-id', '') == RELATIONSHIP_TYPE_OFFICIAL_HOMEPAGE
+            and not rel.get('ended', True)
+            and rel.get('url', {}).get('resource', '')
+        ):
+            websites.append(rel.get('url', {}).get('resource', ''))
+
     return ArtistEntity(
         mbid=mbid,
         name=name_,
@@ -96,6 +117,7 @@ def artist_dict_to_entity(mbid: str, info: dict) -> ArtistEntity | None:
         end=info.get('life-span', {}).get('end', '') or '',
         end_area=(info.get('end-area', {}) or {}).get('id', ''),
         disambiguation=info.get('disambiguation', '') or '',
+        website='; '.join(websites) or '',
     )
 
 
@@ -120,6 +142,7 @@ def artist_entity_to_key_value_pairs(entity: ArtistEntity) -> list[tuple[str, st
         ('end', entity.end),
         ('end-area', entity.end_area),
         ('disambiguation', entity.disambiguation),
+        ('website', entity.website),
     ]
 
 
