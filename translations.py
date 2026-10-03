@@ -122,3 +122,174 @@ class TxStrings:
         "ui.action.not_available.text",
         "That function is not currently available because the cache database is disabled.",
     )
+
+    # Registered Script Variables
+    VARIABLE_ALBUMARTISTS_NAMES = t_(
+        key='variable.albumartists_names',
+        text="The names of the album artists.",
+    )
+    VARIABLE_ALBUMARTISTS_SORT_NAMES = t_(
+        key='variable.albumartists_sort_names',
+        text="The sort names of the album artists.",
+    )
+    VARIABLE_ALBUMARTISTS_TYPES = t_(
+        key='variable.albumartists_types',
+        text="The types of the album artists, such as 'person' or 'group'.",
+    )
+    VARIABLE_ALBUMARTISTS_GENDERS = t_(
+        key='variable.albumartists_genders',
+        text="The genders of the album artists.",
+    )
+    VARIABLE_ALBUMARTISTS_BEGIN_DATES = t_(
+        key='variable.albumartists_begin_dates',
+        text=(
+            "The dates when the album artists began, typically the birth date of a person or the "
+            "formation date of a group."
+        ),
+    )
+    VARIABLE_ALBUMARTISTS_BEGIN_LOCATIONS = t_(
+        key='variable.albumartists_begin_locations',
+        text=(
+            "The locations where the album artists began, typically the birth place of a person or the "
+            "formation place of a group."
+        ),
+    )
+    VARIABLE_ALBUMARTISTS_BEGIN_COUNTRIES = t_(
+        key='variable.albumartists_begin_countries',
+        text=(
+            "The countries where the album artists began, typically the birth country of a person or the "
+            "formation country of a group."
+        ),
+    )
+    VARIABLE_ALBUMARTISTS_END_DATES = t_(
+        key='variable.albumartists_end_dates',
+        text=(
+            "The dates when the album artists ended, typically the death date of a person or the "
+            "disbanding date of a group."
+        ),
+    )
+    VARIABLE_ALBUMARTISTS_END_LOCATIONS = t_(
+        key='variable.albumartists_end_locations',
+        text=(
+            "The locations where the album artists ended, typically the death place of a person or the "
+            "disbanding place of a group."
+        ),
+    )
+    VARIABLE_ALBUMARTISTS_END_COUNTRIES = t_(
+        key='variable.albumartists_end_countries',
+        text=(
+            "The countries where the album artists ended, typically the death country of a person or the "
+            "disbanding country of a group."
+        ),
+    )
+    VARIABLE_ALBUMARTISTS_LOCATIONS = t_(
+        key='variable.albumartists_locations',
+        text="The current home locations of the album artists.",
+    )
+    VARIABLE_ALBUMARTISTS_COUNTRIES = t_(
+        key='variable.albumartists_countries',
+        text="The countries where the album artists are based.",
+    )
+    VARIABLE_ALBUMARTISTS_DISAMBIGUATIONS = t_(
+        key='variable.albumartists_disambiguations',
+        text="The disambiguation comments for the album artists, if any.",
+    )
+    VARIABLE_ALBUMARTISTS_WEBSITES = t_(
+        key='variable.albumartists_websites',
+        text="The websites of the album artists, if any.",
+    )
+
+    VARIABLE_ARTISTS_NAMES = t_(
+        key='variable.artists_names',
+        text=(
+            "The names of the track artists. Only available if the option to process track artists is enabled."
+        ),
+    )
+    VARIABLE_ARTISTS_SORT_NAMES = t_(
+        key='variable.artists_sort_names',
+        text=(
+            "The sort names of the track artists. Only available if the option to process track artists is enabled."
+        ),
+    )
+    VARIABLE_ARTISTS_TYPES = t_(
+        key='variable.artists_types',
+        text=(
+            "The types of the track artists, such as 'person' or 'group'. Only available if the option to process "
+            "track artists is enabled."
+        ),
+    )
+    VARIABLE_ARTISTS_GENDERS = t_(
+        key='variable.artists_genders',
+        text=(
+            "The genders of the track artists. Only available if the option to process track artists is enabled."
+        ),
+    )
+    VARIABLE_ARTISTS_BEGIN_DATES = t_(
+        key='variable.artists_begin_dates',
+        text=(
+            "The dates when the track artists began, typically the birth date of a person or the formation date of a "
+            "group. Only available if the option to process track artists is enabled."
+        ),
+    )
+    VARIABLE_ARTISTS_BEGIN_LOCATIONS = t_(
+        key='variable.artists_begin_locations',
+        text=(
+            "The locations where the track artists began, typically the birth place of a person or the formation place "
+            "of a group. Only available if the option to process track artists is enabled."
+        ),
+    )
+    VARIABLE_ARTISTS_BEGIN_COUNTRIES = t_(
+        key='variable.artists_begin_countries',
+        text=(
+            "The countries where the track artists began, typically the birth country of a person or the formation "
+            "country of a group. Only available if the option to process track artists is enabled."
+        ),
+    )
+    VARIABLE_ARTISTS_END_DATES = t_(
+        key='variable.artists_end_dates',
+        text=(
+            "The dates when the track artists ended, typically the death date of a person or the disbanding date of a "
+            "group. Only available if the option to process track artists is enabled."
+        ),
+    )
+    VARIABLE_ARTISTS_END_LOCATIONS = t_(
+        key='variable.artists_end_locations',
+        text=(
+            "The locations where the track artists ended, typically the death place of a person or the disbanding place "
+            "of a group. Only available if the option to process track artists is enabled."
+        ),
+    )
+    VARIABLE_ARTISTS_END_COUNTRIES = t_(
+        key='variable.artists_end_countries',
+        text=(
+            "The countries where the track artists ended, typically the death country of a person or the disbanding "
+            "country of a group. Only available if the option to process track artists is enabled."
+        ),
+    )
+    VARIABLE_ARTISTS_LOCATIONS = t_(
+        key='variable.artists_locations',
+        text=(
+            "The current home locations of the track artists. Only available if the option to process track artists "
+            "is enabled."
+        ),
+    )
+    VARIABLE_ARTISTS_COUNTRIES = t_(
+        key='variable.artists_countries',
+        text=(
+            "The countries where the track artists are based. Only available if the option to process track artists "
+            "is enabled."
+        ),
+    )
+    VARIABLE_ARTISTS_DISAMBIGUATIONS = t_(
+        key='variable.artists_disambiguations',
+        text=(
+            "The disambiguation comments for the track artists, if any. Only available if the option to process track "
+            "artists is enabled."
+        ),
+    )
+    VARIABLE_ARTISTS_WEBSITES = t_(
+        key='variable.artists_websites',
+        text=(
+            "The websites of the track artists, if any. Only available if the option to process track artists is enabled."
+        ),
+    )

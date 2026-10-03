@@ -104,6 +104,40 @@ OPT_USE_CACHE = 'use_cache'
 OPT_BACKGROUND_FETCH_AREAS = 'background_fetch'
 OPT_BACKGROUND_FETCH_INTERVAL = 'background_fetch_interval'
 
+ALBUM_ARTIST_SCRIPT_VARIABLES = [
+    ('_aad_albumartists_names', TxStrings.VARIABLE_ALBUMARTISTS_NAMES),
+    ('_aad_albumartists_sort_names', TxStrings.VARIABLE_ALBUMARTISTS_SORT_NAMES),
+    ('_aad_albumartists_types', TxStrings.VARIABLE_ALBUMARTISTS_TYPES),
+    ('_aad_albumartists_genders', TxStrings.VARIABLE_ALBUMARTISTS_GENDERS),
+    ('_aad_albumartists_begin_dates', TxStrings.VARIABLE_ALBUMARTISTS_BEGIN_DATES),
+    ('_aad_albumartists_begin_locations', TxStrings.VARIABLE_ALBUMARTISTS_BEGIN_LOCATIONS),
+    ('_aad_albumartists_begin_countries', TxStrings.VARIABLE_ALBUMARTISTS_BEGIN_COUNTRIES),
+    ('_aad_albumartists_end_dates', TxStrings.VARIABLE_ALBUMARTISTS_END_DATES),
+    ('_aad_albumartists_end_locations', TxStrings.VARIABLE_ALBUMARTISTS_END_LOCATIONS),
+    ('_aad_albumartists_end_countries', TxStrings.VARIABLE_ALBUMARTISTS_END_COUNTRIES),
+    ('_aad_albumartists_locations', TxStrings.VARIABLE_ALBUMARTISTS_LOCATIONS),
+    ('_aad_albumartists_countries', TxStrings.VARIABLE_ALBUMARTISTS_COUNTRIES),
+    ('_aad_albumartists_disambiguations', TxStrings.VARIABLE_ALBUMARTISTS_DISAMBIGUATIONS),
+    ('_aad_albumartists_websites', TxStrings.VARIABLE_ALBUMARTISTS_WEBSITES),
+]
+
+TRACK_ARTIST_SCRIPT_VARIABLES = [
+    ('_aad_artists_names', TxStrings.VARIABLE_ARTISTS_NAMES),
+    ('_aad_artists_sort_names', TxStrings.VARIABLE_ARTISTS_SORT_NAMES),
+    ('_aad_artists_types', TxStrings.VARIABLE_ARTISTS_TYPES),
+    ('_aad_artists_genders', TxStrings.VARIABLE_ARTISTS_GENDERS),
+    ('_aad_artists_begin_dates', TxStrings.VARIABLE_ARTISTS_BEGIN_DATES),
+    ('_aad_artists_begin_locations', TxStrings.VARIABLE_ARTISTS_BEGIN_LOCATIONS),
+    ('_aad_artists_begin_countries', TxStrings.VARIABLE_ARTISTS_BEGIN_COUNTRIES),
+    ('_aad_artists_end_dates', TxStrings.VARIABLE_ARTISTS_END_DATES),
+    ('_aad_artists_end_locations', TxStrings.VARIABLE_ARTISTS_END_LOCATIONS),
+    ('_aad_artists_end_countries', TxStrings.VARIABLE_ARTISTS_END_COUNTRIES),
+    ('_aad_artists_locations', TxStrings.VARIABLE_ARTISTS_LOCATIONS),
+    ('_aad_artists_countries', TxStrings.VARIABLE_ARTISTS_COUNTRIES),
+    ('_aad_artists_disambiguations', TxStrings.VARIABLE_ARTISTS_DISAMBIGUATIONS),
+    ('_aad_artists_websites', TxStrings.VARIABLE_ARTISTS_WEBSITES),
+]
+
 lock = threading.Lock()
 
 
@@ -1095,9 +1129,16 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_AREAS] = SharedVars.background_processing_enabled
         SharedVars.background_processing_interval = self.ui.background_processing_interval.value()
         SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_INTERVAL] = SharedVars.background_processing_interval
+
         if SharedVars.use_persistent_cache:
             initialize_cache_db()
             DataCache.clear_cache()
+
+        if SharedVars.api.plugin_config[OPT_PROCESS_TRACKS]:
+            register_track_variables()
+        else:
+            deregister_track_variables()
+
         set_actions_enabled_states()
 
     def _use_cache_state_changed(self) -> None:
@@ -1689,6 +1730,44 @@ def set_actions_enabled_states():
     signaller.set_edit_cache_state.emit(cache_enabled)
 
 
+def register_album_variables():
+    """Register the album variables for the plugin."""
+    for var in ALBUM_ARTIST_SCRIPT_VARIABLES:
+        SharedVars.api.register_script_variable(
+            name=var[0],
+            documentation=SharedVars.api.tr(var[1]),
+            is_multi_value=True,
+            is_from_mb=True,
+        )
+
+
+def register_track_variables():
+    """Register the track variables for the plugin."""
+    if SharedVars.track_variables_registered:
+        return
+
+    for var in TRACK_ARTIST_SCRIPT_VARIABLES:
+        SharedVars.api.register_script_variable(
+            name=var[0],
+            documentation=SharedVars.api.tr(var[1]),
+            is_multi_value=True,
+            is_from_mb=True,
+        )
+
+    SharedVars.track_variables_registered = True
+
+
+def deregister_track_variables():
+    """Deregister the track variables for the plugin."""
+    if not SharedVars.track_variables_registered:
+        return
+
+    for var in TRACK_ARTIST_SCRIPT_VARIABLES:
+        SharedVars.api.unregister_script_variable(name=var[0])
+
+    SharedVars.track_variables_registered = False
+
+
 def enable(api: PluginApi) -> None:
     """Called when the plugin is enabled.
 
@@ -1742,6 +1821,10 @@ def enable(api: PluginApi) -> None:
     api.register_album_post_removal_processor(plugin.remove_album)
 
     set_actions_enabled_states()
+
+    register_album_variables()
+    if api.plugin_config[OPT_PROCESS_TRACKS]:
+        register_track_variables()
 
 
 def disable():

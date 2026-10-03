@@ -39,6 +39,9 @@ class SharedVars:
     background_processing_running: bool = False
     """Indicates whether background processing is currently running"""
 
+    track_variables_registered: bool = False
+    """Indicates whether the track variables have been registered"""
+
 
 class FileFilters:
     """Standard file filter strings"""
