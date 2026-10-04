@@ -29,7 +29,6 @@ from PyQt6.QtCore import (
     pyqtBoundSignal,
 )
 
-from picard.debug_opts import DebugOpt
 from picard.plugin3.api import (
     Album,
     BaseAction,
@@ -103,6 +102,7 @@ OPT_SAVE_ARTISTS_IN_CACHE = 'save_artists_cache'
 OPT_USE_CACHE = 'use_cache'
 OPT_BACKGROUND_FETCH_AREAS = 'background_fetch'
 OPT_BACKGROUND_FETCH_INTERVAL = 'background_fetch_interval'
+OPT_VERBOSE_LOG = 'verbose_log'
 
 ALBUM_ARTIST_SCRIPT_VARIABLES = [
     ('_aad_albumartists_names', TxStrings.VARIABLE_ALBUMARTISTS_NAMES),
@@ -278,14 +278,12 @@ class ArtistDetailsPlugin:
 
     @classmethod
     def _debug_logger(cls, text: str) -> None:
-        """Debug logging helper to use `debug_if()` if available.
+        """Debug logging helper to only log when verbose logging is enabled.
 
         Args:
             text (str): Message to log.
         """
-        if cls.has_debug_if:
-            SharedVars.api.logger.debug_if(DebugOpt.PLUGIN_DEVELOPMENT, text)
-        else:
+        if SharedVars.verbose_log_enabled:
             SharedVars.api.logger.debug(text)
 
     @classmethod
@@ -585,6 +583,12 @@ class ArtistDetailsPlugin:
             SharedVars.api.logger.error("No metadata targets found for album '%s'", album_id)
             return False
 
+        def _set_item(track_id: str, destination: Metadata, key: str, value: str | list) -> None:
+            if isinstance(value, str):
+                value = f'"{value}"'
+            cls._debug_logger(f"Setting track '{track_id}' variable '{key}' => {value}")
+            destination[key] = value
+
         album_artists = []
         for artist in album.get_album_artists():
             if artist.id not in album_artists:
@@ -599,10 +603,10 @@ class ArtistDetailsPlugin:
             artists = cls.albums[album_id][ALBUM_ARTISTS].copy().union(set(item.artists))
             for artist in artists:
                 if artist in cls.cache_requests['artist'] or DataCache.get_artist_info(artist) is not None:
-                    cls._set_artist_metadata(item.target, artist)
+                    cls._set_artist_metadata(item.track_id, item.target, artist)
 
             for key, value in album_vars:
-                item.target[f'~aad_albumartists_{key}'] = value
+                _set_item(item.track_id, item.target, f'~aad_albumartists_{key}', value)
 
         # Create `~aad_artists_{key}` and `~aad_albumartists_{key}` variables for all tracks in the album
         for item in cls.albums[album_id][TRACKS]:
@@ -612,21 +616,25 @@ class ArtistDetailsPlugin:
 
             values = cls._get_artist_vars(item.artists)
             for key, value in values:
-                item.target[f'~aad_artists_{key}'] = value
+                _set_item(item.track_id, item.target, f'~aad_artists_{key}', value)
 
         return True
 
     @classmethod
-    def _set_artist_metadata(cls, destination_metadata: Metadata, artist_id: str) -> None:
+    def _set_artist_metadata(cls, track_id: str, destination_metadata: Metadata, artist_id: str) -> None:
         """Adds the artist information to the destination metadata.
 
         Args:
+            track_id (str): The ID of the track to update.
             destination_metadata (Metadata): Metadata object to update with new variables.
             artist_id (str): MBID of the artist to update.
         """
 
         def _set_item(key: str, value: str | list) -> None:
             key_ = f"~artist_{artist_id}_{key.replace('-', '_')}"
+            if isinstance(value, str):
+                value = f'"{value}"'
+            cls._debug_logger(f"Setting track '{track_id}' variable '{key_}' => {value}")
             destination_metadata[key_] = value
 
         artist_info = DataCache.get_artist_info(artist_id)
@@ -1113,6 +1121,7 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         self.ui.cb_save_artists.setChecked(SharedVars.api.plugin_config[OPT_SAVE_ARTISTS_IN_CACHE])
         self.ui.cb_use_background_processing.setChecked(SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_AREAS])
         self.ui.background_processing_interval.setValue(SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_INTERVAL])
+        self.ui.cb_verbose_log.setChecked(SharedVars.api.plugin_config[OPT_VERBOSE_LOG])
         self._set_button_states()
 
     def save(self) -> None:
@@ -1129,6 +1138,8 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_AREAS] = SharedVars.background_processing_enabled
         SharedVars.background_processing_interval = self.ui.background_processing_interval.value()
         SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_INTERVAL] = SharedVars.background_processing_interval
+        SharedVars.verbose_log_enabled = self.ui.cb_verbose_log.isChecked()
+        SharedVars.api.plugin_config[OPT_VERBOSE_LOG] = SharedVars.verbose_log_enabled
 
         if SharedVars.use_persistent_cache:
             initialize_cache_db()
@@ -1783,6 +1794,7 @@ def enable(api: PluginApi) -> None:
     api.plugin_config.register_option(OPT_SAVE_ARTISTS_IN_CACHE, True)
     api.plugin_config.register_option(OPT_BACKGROUND_FETCH_AREAS, False)
     api.plugin_config.register_option(OPT_BACKGROUND_FETCH_INTERVAL, DEFAULT_BACKGROUND_PROCESSING_INTERVAL)
+    api.plugin_config.register_option(OPT_VERBOSE_LOG, False)
 
     # Migrate settings from 2.x version if available
     migrate_settings(api)

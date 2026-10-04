@@ -42,6 +42,9 @@ class SharedVars:
     track_variables_registered: bool = False
     """Indicates whether the track variables have been registered"""
 
+    verbose_log_enabled: bool = False
+    """Indicates whether verbose logging is enabled"""
+
 
 class FileFilters:
     """Standard file filter strings"""

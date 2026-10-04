@@ -69,6 +69,16 @@
     </spacer>
    </item>
    <item>
+    <widget class="QCheckBox" name="cb_verbose_log">
+     <property name="toolTip">
+      <string>checkbox.verbose_logging.tooltip</string>
+     </property>
+     <property name="text">
+      <string>checkbox.verbose_logging.text</string>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="QLabel" name="process_section_title">
      <property name="font">
       <font>
@@ -467,6 +477,7 @@
   </layout>
  </widget>
  <tabstops>
+  <tabstop>cb_verbose_log</tabstop>
   <tabstop>cb_process_tracks</tabstop>
   <tabstop>cb_area_county</tabstop>
   <tabstop>cb_area_municipality</tabstop>
