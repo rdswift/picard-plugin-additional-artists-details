@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>561</width>
-    <height>666</height>
+    <height>723</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -51,22 +51,6 @@
       <bool>true</bool>
      </property>
     </widget>
-   </item>
-   <item>
-    <spacer name="verticalSpacer_2">
-     <property name="orientation">
-      <enum>Qt::Orientation::Vertical</enum>
-     </property>
-     <property name="sizeType">
-      <enum>QSizePolicy::Policy::Fixed</enum>
-     </property>
-     <property name="sizeHint" stdset="0">
-      <size>
-       <width>20</width>
-       <height>6</height>
-      </size>
-     </property>
-    </spacer>
    </item>
    <item>
     <widget class="QCheckBox" name="cb_verbose_log">
@@ -170,7 +154,7 @@
        </widget>
       </item>
       <item>
-       <layout class="QVBoxLayout" name="verticalLayout_6">
+       <layout class="QVBoxLayout" name="verticalLayout_9">
         <property name="spacing">
          <number>0</number>
         </property>
@@ -240,6 +224,9 @@
       <enum>QFrame::Shadow::Plain</enum>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_3">
+      <property name="spacing">
+       <number>6</number>
+      </property>
       <item>
        <widget class="QLabel" name="cache_section_text">
         <property name="text">
@@ -251,104 +238,146 @@
        </widget>
       </item>
       <item>
-       <widget class="QCheckBox" name="cb_use_cache">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
+       <layout class="QVBoxLayout" name="verticalLayout_6">
+        <property name="spacing">
+         <number>0</number>
         </property>
-        <property name="text">
-         <string>option.use_cache</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="cb_save_artists">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="text">
-         <string>option.cache.save_artists</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <layout class="QHBoxLayout" name="horizontalLayout">
         <property name="topMargin">
          <number>0</number>
         </property>
         <item>
-         <widget class="QLabel" name="cache_file_label">
+         <widget class="QCheckBox" name="cb_use_cache">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
           <property name="text">
-           <string>label.cache_file</string>
+           <string>option.use_cache</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QLineEdit" name="cache_file">
-          <property name="text">
-           <string notr="true"/>
+         <widget class="QCheckBox" name="cb_save_artists">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
           </property>
-          <property name="readOnly">
-           <bool>true</bool>
+          <property name="text">
+           <string>option.cache.save_artists</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QToolButton" name="b_open_cache_directory">
-          <property name="toolTip">
-           <string>tooltip.button.open_cache_dir</string>
-          </property>
-          <property name="text">
-           <string>...</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item>
-       <layout class="QHBoxLayout" name="horizontalLayout_3">
-        <property name="topMargin">
-         <number>0</number>
-        </property>
-        <item>
-         <spacer name="horizontalSpacer">
+         <spacer name="verticalSpacer_2">
           <property name="orientation">
-           <enum>Qt::Orientation::Horizontal</enum>
+           <enum>Qt::Orientation::Vertical</enum>
+          </property>
+          <property name="sizeType">
+           <enum>QSizePolicy::Policy::Fixed</enum>
           </property>
           <property name="sizeHint" stdset="0">
            <size>
-            <width>40</width>
-            <height>20</height>
+            <width>20</width>
+            <height>3</height>
            </size>
           </property>
          </spacer>
         </item>
         <item>
-         <widget class="QPushButton" name="b_delete_cache">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-            <horstretch>1</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
+         <layout class="QHBoxLayout" name="horizontalLayout">
+          <property name="topMargin">
+           <number>0</number>
           </property>
-          <property name="maximumSize">
+          <item>
+           <widget class="QLabel" name="cache_file_label">
+            <property name="text">
+             <string>label.cache_file</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="cache_file">
+            <property name="text">
+             <string notr="true"/>
+            </property>
+            <property name="readOnly">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="b_open_cache_directory">
+            <property name="toolTip">
+             <string>tooltip.button.open_cache_dir</string>
+            </property>
+            <property name="text">
+             <string>...</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <spacer name="verticalSpacer_6">
+          <property name="orientation">
+           <enum>Qt::Orientation::Vertical</enum>
+          </property>
+          <property name="sizeType">
+           <enum>QSizePolicy::Policy::Fixed</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
            <size>
-            <width>110</width>
-            <height>16777215</height>
+            <width>20</width>
+            <height>3</height>
            </size>
           </property>
-          <property name="toolTip">
-           <string>tooltip.button.delete</string>
+         </spacer>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_3">
+          <property name="topMargin">
+           <number>0</number>
           </property>
-          <property name="text">
-           <string>button.delete</string>
-          </property>
-         </widget>
+          <item>
+           <spacer name="horizontalSpacer">
+            <property name="orientation">
+             <enum>Qt::Orientation::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QPushButton" name="b_delete_cache">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+              <horstretch>1</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>110</width>
+              <height>16777215</height>
+             </size>
+            </property>
+            <property name="toolTip">
+             <string>tooltip.button.delete</string>
+            </property>
+            <property name="text">
+             <string>button.delete</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
         </item>
        </layout>
       </item>
@@ -392,6 +421,9 @@
       <enum>QFrame::Shadow::Raised</enum>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_2">
+      <property name="spacing">
+       <number>6</number>
+      </property>
       <item>
        <widget class="QLabel" name="background_processing_label">
         <property name="text">
@@ -403,55 +435,91 @@
        </widget>
       </item>
       <item>
-       <widget class="QCheckBox" name="cb_use_background_processing">
-        <property name="text">
-         <string>option.cache.background_processing</string>
+       <layout class="QVBoxLayout" name="verticalLayout_10">
+        <property name="spacing">
+         <number>0</number>
         </property>
-       </widget>
-      </item>
-      <item>
-       <layout class="QHBoxLayout" name="horizontalLayout_4">
         <property name="topMargin">
          <number>0</number>
         </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
         <item>
-         <widget class="QLabel" name="background_processing_interval_label">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-            <horstretch>1</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
+         <layout class="QHBoxLayout" name="horizontalLayout_4">
+          <property name="topMargin">
+           <number>0</number>
           </property>
-          <property name="text">
-           <string>option.cache.background_processing_interval</string>
-          </property>
-         </widget>
+          <item>
+           <widget class="QCheckBox" name="cb_use_background_processing">
+            <property name="text">
+             <string>option.cache.background_processing</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer_2">
+            <property name="orientation">
+             <enum>Qt::Orientation::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>1</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="background_processing_interval">
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
+            </property>
+            <property name="minimum">
+             <number>20</number>
+            </property>
+            <property name="maximum">
+             <number>600</number>
+            </property>
+           </widget>
+          </item>
+         </layout>
         </item>
         <item>
-         <spacer name="horizontalSpacer_2">
-          <property name="orientation">
-           <enum>Qt::Orientation::Horizontal</enum>
+         <layout class="QHBoxLayout" name="horizontalLayout_2">
+          <property name="topMargin">
+           <number>0</number>
           </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>1</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
-        <item>
-         <widget class="QSpinBox" name="background_processing_interval">
-          <property name="alignment">
-           <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
-          </property>
-          <property name="minimum">
-           <number>20</number>
-          </property>
-          <property name="maximum">
-           <number>600</number>
-          </property>
-         </widget>
+          <item>
+           <widget class="QCheckBox" name="cb_flush_artists_cache">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="toolTip">
+             <string>tooltip.flush_artists_cache</string>
+            </property>
+            <property name="text">
+             <string>option.flush_artists_cache</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="artist_flush_interval">
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
+            </property>
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>999</number>
+            </property>
+           </widget>
+          </item>
+         </layout>
         </item>
        </layout>
       </item>
@@ -489,6 +557,8 @@
   <tabstop>b_delete_cache</tabstop>
   <tabstop>cb_use_background_processing</tabstop>
   <tabstop>background_processing_interval</tabstop>
+  <tabstop>cb_flush_artists_cache</tabstop>
+  <tabstop>artist_flush_interval</tabstop>
  </tabstops>
  <resources/>
  <connections/>

@@ -17,6 +17,7 @@
 
 from collections.abc import Generator
 import csv
+import datetime
 import json
 import os
 import sqlite3
@@ -40,17 +41,17 @@ from .misc_utils import (
 class DatabaseUtils:
     """Utility functions for working with the plugin's database."""
 
-    DB_VERSION: int = 3
+    DB_VERSION: int = 4
 
     _INSERT_ARTIST: str = (
         "INSERT OR REPLACE INTO artists (mbid, name, sort, type, gender, area, begin, begin_area, "
-        "end, end_area, disambiguation, website) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        "end, end_area, disambiguation, website, refreshed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
 
     _INSERT_AREA: str = "INSERT OR REPLACE INTO areas (mbid, parent, name, country, type) VALUES (?, ?, ?, ?, ?)"
 
     _SELECT_ARTIST: str = (
-        "SELECT mbid, name, sort, type, gender, area, begin, begin_area, end, end_area, disambiguation, website FROM artists"
+        "SELECT mbid, name, sort, type, gender, area, begin, begin_area, end, end_area, disambiguation, website, refreshed FROM artists"
     )
 
     _SELECT_AREA: str = "SELECT mbid, parent, name, country, type FROM areas"
@@ -134,6 +135,23 @@ class DatabaseUtils:
             if cls._execute_non_query(sql):
                 current_version = 3  # Update current_version after applying the update
                 cls.set_db_version(3)
+                cls.compact_database()
+
+        # Update for version 4
+        #  - Add a new column 'refreshed' to the 'artists' table
+        if current_version < 4:
+            if SharedVars.api:
+                SharedVars.api.logger.info("Updating database schema to version 4.")
+            sql = "ALTER TABLE artists ADD COLUMN refreshed TEXT;"
+            if not cls._execute_non_query(sql):
+                return  # If the update fails, exit without changing the version
+
+            # Initialize the 'refreshed' column with a default value (current date)
+            today_str = datetime.date.today().strftime("%Y-%m-%d")
+            sql = "UPDATE artists SET refreshed = ?;"
+            if cls._execute_non_query(sql, (today_str,)):
+                current_version = 4  # Update current_version after applying the update
+                cls.set_db_version(4)
                 cls.compact_database()
 
     @classmethod
@@ -330,6 +348,7 @@ class DatabaseUtils:
                             artist.get('end-area', ''),
                             artist.get('disambiguation', ''),
                             artist.get('website', ''),
+                            datetime.date.today().strftime("%Y-%m-%d"),
                         ),
                     )
                 conn.commit()
@@ -433,9 +452,11 @@ class DatabaseUtils:
                         continue  # Invalid area MBID
                     if row[10] and not is_valid_mbid(row[10]):
                         continue  # Invalid area MBID
+                    args = [row[i] for i in range(1, 13)]  # Prepare the first 12 columns for insertion
+                    args.append(datetime.date.today().strftime("%Y-%m-%d"))
                     cursor.execute(
                         cls._INSERT_ARTIST,
-                        (row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11], row[12]),
+                        tuple(args),
                     )
 
             conn.commit()
@@ -653,6 +674,7 @@ class DatabaseUtils:
                         artist.end_area,
                         artist.disambiguation,
                         artist.website,
+                        datetime.date.today().strftime("%Y-%m-%d"),
                     ),
                 )
                 conn.commit()
@@ -819,3 +841,30 @@ class DatabaseUtils:
             cls.log_error('get_orphan_areas()', ex)
 
         return ''
+
+    @classmethod
+    def purge_old_artists(cls, days: int) -> int:
+        """Purge artist records that have not been refreshed in the specified number of days.
+
+        Args:
+            days (int): The number of days to determine if an artist record is old.
+
+        Returns:
+            int: The number of artist records that were purged.
+        """
+        if not os.path.exists(DB_FILE):
+            return 0
+
+        try:
+            with cls.connect_to_database() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"DELETE FROM artists WHERE refreshed < date('now', '-{days} days');"
+                )
+                conn.commit()
+                return cursor.rowcount
+
+        except sqlite3.Error as ex:
+            cls.log_error('purge_old_artists()', ex)
+
+        return 0

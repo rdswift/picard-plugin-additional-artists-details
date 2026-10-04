@@ -45,6 +45,13 @@ class SharedVars:
     verbose_log_enabled: bool = False
     """Indicates whether verbose logging is enabled"""
 
+    purge_artists_cache: bool = False
+    """Indicates whether the artists cache should be purged"""
+    purge_artists_older_than: int = 30
+    """Indicates the number of days after which artists should be purged from the cache"""
+    purge_artists_last_run: str = '2026-01-01'
+    """Indicates the last time the artists cache was purged"""
+
 
 class FileFilters:
     """Standard file filter strings"""

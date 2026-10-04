@@ -17,6 +17,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
+import datetime
 from functools import partial
 import os
 import threading
@@ -103,6 +104,9 @@ OPT_USE_CACHE = 'use_cache'
 OPT_BACKGROUND_FETCH_AREAS = 'background_fetch'
 OPT_BACKGROUND_FETCH_INTERVAL = 'background_fetch_interval'
 OPT_VERBOSE_LOG = 'verbose_log'
+OPT_PURGE_LAST_CHECKED = 'purge_last_checked'
+OPT_PURGE_ARTISTS = 'purge_artists'
+OPT_PURGE_ARTISTS_OLDER_THAN = 'purge_artists_older_than'
 
 ALBUM_ARTIST_SCRIPT_VARIABLES = [
     ('_aad_albumartists_names', TxStrings.VARIABLE_ALBUMARTISTS_NAMES),
@@ -988,6 +992,10 @@ class ArtistDetailsPlugin:
     @classmethod
     def process_orphan_areas(cls) -> None:
         """Retrieve missing area parents in the background."""
+        # Initiate artists purge if the last purge check was on a previous day
+        if datetime.date.today().strftime("%Y-%m-%d") > SharedVars.purge_artists_last_run:
+            purge_artists_cache()
+
         if SharedVars.background_processing_running:
             return
 
@@ -1106,6 +1114,8 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
 
         self.ui.cb_use_cache.stateChanged.connect(self._use_cache_state_changed)
         self.ui.cb_use_background_processing.stateChanged.connect(self._use_bg_processing_state_changed)
+        self.ui.cb_flush_artists_cache.stateChanged.connect(self._purge_artists_state_changed)
+        self.ui.cb_save_artists.stateChanged.connect(self._save_artists_state_changed)
 
         self.ui.cache_file.setText(DB_FILE)
 
@@ -1122,6 +1132,8 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         self.ui.cb_use_background_processing.setChecked(SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_AREAS])
         self.ui.background_processing_interval.setValue(SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_INTERVAL])
         self.ui.cb_verbose_log.setChecked(SharedVars.api.plugin_config[OPT_VERBOSE_LOG])
+        self.ui.cb_flush_artists_cache.setChecked(SharedVars.api.plugin_config[OPT_PURGE_ARTISTS])
+        self.ui.artist_flush_interval.setValue(SharedVars.api.plugin_config[OPT_PURGE_ARTISTS_OLDER_THAN])
         self._set_button_states()
 
     def save(self) -> None:
@@ -1140,6 +1152,10 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
         SharedVars.api.plugin_config[OPT_BACKGROUND_FETCH_INTERVAL] = SharedVars.background_processing_interval
         SharedVars.verbose_log_enabled = self.ui.cb_verbose_log.isChecked()
         SharedVars.api.plugin_config[OPT_VERBOSE_LOG] = SharedVars.verbose_log_enabled
+        SharedVars.purge_artists_cache = self.ui.cb_flush_artists_cache.isChecked()
+        SharedVars.api.plugin_config[OPT_PURGE_ARTISTS] = SharedVars.purge_artists_cache
+        SharedVars.purge_artists_older_than = self.ui.artist_flush_interval.value()
+        SharedVars.api.plugin_config[OPT_PURGE_ARTISTS_OLDER_THAN] = SharedVars.purge_artists_older_than
 
         if SharedVars.use_persistent_cache:
             initialize_cache_db()
@@ -1158,15 +1174,25 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
     def _use_bg_processing_state_changed(self) -> None:
         self._set_button_states()
 
+    def _purge_artists_state_changed(self) -> None:
+        self._set_button_states()
+
+    def _save_artists_state_changed(self) -> None:
+        self._set_button_states()
+
     def _set_button_states(self) -> None:
         cache_exists = os.path.isfile(DB_FILE)
         enabled = self.ui.cb_use_cache.isChecked()
-        bg_enabled = self.ui.cb_use_background_processing.isChecked()
+        bg_enabled = self.ui.cb_use_background_processing.isChecked() and enabled
+        purge_enabled = self.ui.cb_flush_artists_cache.isChecked()
+        use_artists_enabled = self.ui.cb_save_artists.isChecked() and enabled
 
         self.ui.cb_save_artists.setEnabled(enabled)
         self.ui.b_delete_cache.setEnabled(cache_exists and not enabled)
         self.ui.cb_use_background_processing.setEnabled(enabled)
-        self.ui.background_processing_interval.setEnabled(enabled and bg_enabled)
+        self.ui.background_processing_interval.setEnabled(bg_enabled)
+        self.ui.cb_flush_artists_cache.setEnabled(use_artists_enabled)
+        self.ui.artist_flush_interval.setEnabled(purge_enabled and use_artists_enabled)
 
     def cache_delete(self) -> bool:
         if (
@@ -1779,6 +1805,23 @@ def deregister_track_variables():
     SharedVars.track_variables_registered = False
 
 
+def purge_artists_cache():
+    """Purge artists from the cache that are older than the specified number of days."""
+    if not (SharedVars.use_persistent_cache and SharedVars.purge_artists_cache):
+        return
+
+    today = datetime.date.today().strftime("%Y-%m-%d")
+    if today > SharedVars.purge_artists_last_run:
+        SharedVars.purge_artists_last_run = today
+        SharedVars.api.plugin_config[OPT_PURGE_LAST_CHECKED] = today
+        days = SharedVars.purge_artists_older_than
+        count = DatabaseUtils.purge_old_artists(days)
+        # DataCache.clear_cache()
+        SharedVars.api.logger.info(
+            f"purged {count} artist{'s' if count != 1 else ''} from the cache older than {days} day{'' if days == 1 else 's'}."
+        )
+
+
 def enable(api: PluginApi) -> None:
     """Called when the plugin is enabled.
 
@@ -1795,6 +1838,9 @@ def enable(api: PluginApi) -> None:
     api.plugin_config.register_option(OPT_BACKGROUND_FETCH_AREAS, False)
     api.plugin_config.register_option(OPT_BACKGROUND_FETCH_INTERVAL, DEFAULT_BACKGROUND_PROCESSING_INTERVAL)
     api.plugin_config.register_option(OPT_VERBOSE_LOG, False)
+    api.plugin_config.register_option(OPT_PURGE_LAST_CHECKED, '2026-01-01')
+    api.plugin_config.register_option(OPT_PURGE_ARTISTS, False)
+    api.plugin_config.register_option(OPT_PURGE_ARTISTS_OLDER_THAN, 30)
 
     # Migrate settings from 2.x version if available
     migrate_settings(api)
@@ -1816,11 +1862,17 @@ def enable(api: PluginApi) -> None:
     SharedVars.background_processing_enabled = api.plugin_config[OPT_BACKGROUND_FETCH_AREAS]
     SharedVars.background_processing_interval = api.plugin_config[OPT_BACKGROUND_FETCH_INTERVAL]
     SharedVars.background_processing_running = False
+    SharedVars.verbose_log_enabled = api.plugin_config[OPT_VERBOSE_LOG]
+    SharedVars.purge_artists_cache = api.plugin_config[OPT_PURGE_ARTISTS]
+    SharedVars.purge_artists_older_than = api.plugin_config[OPT_PURGE_ARTISTS_OLDER_THAN]
+    SharedVars.purge_artists_last_run = api.plugin_config[OPT_PURGE_LAST_CHECKED]
+    api.plugin_config[OPT_PURGE_LAST_CHECKED] = SharedVars.purge_artists_last_run
+    SharedVars.track_variables_registered = False
 
     if SharedVars.use_persistent_cache:
         initialize_cache_db()
     else:
-        api.logger.info("Persistent cache is diabled.")
+        api.logger.info("Persistent cache is disabled.")
 
     # Register menu actions
     api.register_tools_menu_action(DisplayCacheStatusAction)
@@ -1837,6 +1889,9 @@ def enable(api: PluginApi) -> None:
     register_album_variables()
     if api.plugin_config[OPT_PROCESS_TRACKS]:
         register_track_variables()
+
+    # QTimer.singleShot(10000, purge_artists_cache)
+    purge_artists_cache()
 
 
 def disable():
