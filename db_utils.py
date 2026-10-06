@@ -181,8 +181,8 @@ class DatabaseUtils:
         try:
             with cls.connect_to_database() as conn:
                 cursor = conn.cursor()
-                cursor.execute("DELETE FROM db_version;")
                 cursor.execute("INSERT OR REPLACE INTO db_version (version) VALUES (?);", (version,))
+                cursor.execute("DELETE FROM db_version WHERE version != ?;", (version,))
                 conn.commit()
         except sqlite3.Error as ex:
             cls.log_error('set_db_version()', ex)
