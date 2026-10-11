@@ -19,13 +19,11 @@ report_bugs_to = "https://github.com/rdswift/picard-plugin-additional-artists-de
 de = "Weitere Details zu den Künstlern"
 fr = "Informations supplémentaires sur les artistes"
 zh_CN = "附加艺术家详细信息"
-zh_Hans = "附加艺术家详细信息"
 
 [description_i18n]
 de = "Dieses Plugin stellt spezielle Album- und Titelvariablen mit Künstlerinformationen zur Verwendung in Tagging- und Benennungsskripten bereit."
 fr = "Ce plugin fournit des variables spécifiques aux albums et aux morceaux, ainsi que des informations sur les artistes, destinées à être utilisées dans les scripts de balisage et de nommage."
 zh_CN = "此插件提供具有艺术家详细信息的专用专辑和音轨变量，用于标签和命名脚本。"
-zh_Hans = "此插件提供具有艺术家详细信息的专用专辑和音轨变量，用于标签和命名脚本。"
 
 [long_description_i18n]
 de = """
@@ -38,4 +36,3 @@ wodurch die Verarbeitungsgeschwindigkeit erheblich gesteigert werden kann, wenn 
 
 fr = "Ce plugin fournit des variables spécialisées pour les albums et les pistes, ainsi que des informations sur les artistes, destinées à être utilisées dans les scripts de balisage et de nommage. Notez que cela génère des appels supplémentaires à l'API MusicBrainz pour obtenir les informations sur les artistes et la région, ce qui ralentit le traitement. Ce ralentissement sera particulièrement perceptible lorsqu'il y a de nombreux artistes différents pour les albums ou les pistes, comme c'est le cas sur un album [Various Artists]. Une option permet de désactiver le traitement des artistes de pistes, ce qui peut augmenter considérablement la vitesse de traitement si vous ne vous intéressez qu'aux informations sur l'artiste de l'album."
 zh_CN = "此插件提供具有艺术家详细信息的专用专辑和音轨变量，用于标签和命名脚本。请注意，这会为艺术家和地区信息创建额外的 MusicBrainz API 调用，并会减慢处理速度。当有大量不同的专辑或音轨艺术家时，例如在 [Various Artists] 发行品上，这种情况会特别明显。有一个选项可以禁用音轨艺术家处理，如果您只对专辑艺术家详细信息感兴趣，这可以显著提高处理速度。"
-zh_Hans = "此插件提供具有艺术家详细信息的专用专辑和音轨变量，用于标签和命名脚本。请注意，这会为艺术家和地区信息创建额外的 MusicBrainz API 调用，并会减慢处理速度。当有大量不同的专辑或音轨艺术家时，例如在 [Various Artists] 发行品上，这种情况会特别明显。有一个选项可以禁用音轨艺术家处理，如果您只对专辑艺术家详细信息感兴趣，这可以显著提高处理速度。"
