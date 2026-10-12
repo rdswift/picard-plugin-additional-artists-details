@@ -636,10 +636,10 @@ class ArtistDetailsPlugin:
 
         def _set_item(key: str, value: str | list) -> None:
             key_ = f"~artist_{artist_id}_{key.replace('-', '_')}"
+            destination_metadata[key_] = value
             if isinstance(value, str):
                 value = f'"{value}"'
             cls._debug_logger(f"Setting track '{track_id}' variable '{key_}' => {value}")
-            destination_metadata[key_] = value
 
         artist_info = DataCache.get_artist_info(artist_id)
 
