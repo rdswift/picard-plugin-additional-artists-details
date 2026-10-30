@@ -2,9 +2,6 @@ name: Feature Request
 description: Request an enhancement or new feature.
 title: "[Feature]: "
 labels: ["enhancement"]
-# projects: ["octo-org/1", "octo-org/44"]
-# assignees:
-#   - octocat
 type: enhancement
 body:
   - type: markdown
