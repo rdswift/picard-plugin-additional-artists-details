@@ -94,6 +94,18 @@
 "ui.success.import" = "Successfully imported the cache file.\nFile: %s"
 "ui.title" = "Additional Artists Details"
 
+"ui.option.title.process_tracks" = "Process tracks"
+"ui.option.title.area_county" = "Include county"
+"ui.option.title.area_municipality" = "Include municipality"
+"ui.option.title.area_subdivision" = "Include subdivision"
+"ui.option.title.use_cache" = "Use cache database"
+"ui.option.title.cache_artists" = "Cache artists"
+"ui.option.title.background_fetch" = "Fetch missing areas"
+"ui.option.title.background_fetch_interval" = "Fetch interval"
+"ui.option.title.verbose_log" = "Verbose logging"
+"ui.option.title.purge_artists" = "Purge old artist records"
+"ui.option.title.purge_older_than" = "Purge artist records age"
+
 "variable.albumartists_begin_countries" = "The countries where the album artists began, typically the birth country of a person or the formation country of a group."
 "variable.albumartists_begin_dates" = "The dates when the album artists began, typically the birth date of a person or the formation date of a group."
 "variable.albumartists_begin_locations" = "The locations where the album artists began, typically the birth place of a person or the formation place of a group."

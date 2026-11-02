@@ -94,6 +94,18 @@
 "ui.success.import" = "Le fichier de cache a été importé avec succès.\nFichier : %s"
 "ui.title" = "Informations supplémentaires sur les artistes"
 
+"ui.option.title.process_tracks" = "Traiter les pistes"
+"ui.option.title.area_county" = "Inclure le comté"
+"ui.option.title.area_municipality" = "Inclure la municipality"
+"ui.option.title.area_subdivision" = "Inclure la subdivision géographique"
+"ui.option.title.use_cache" = "Utiliser la base de données de cache"
+"ui.option.title.cache_artists" = "Mettre les artistes en cache"
+"ui.option.title.background_fetch" = "Récupérer les zones manquantes"
+"ui.option.title.background_fetch_interval" = "Intervalle de récupération"
+"ui.option.title.verbose_log" = "Journalisation détaillée"
+"ui.option.title.purge_artists" = "Supprimer les anciennes fiches d'artistes"
+"ui.option.title.purge_older_than" = "Supprimer l'âge des artistes"
+
 "variable.albumartists_begin_countries" = "Les pays d'origine des artistes de l'album, c'est-à-dire généralement le pays de naissance d'une personne ou le pays où le groupe s'est formé."
 "variable.albumartists_begin_dates" = "Les dates marquant les débuts des artistes de l'album, généralement la date de naissance d'une personne ou la date de création d'un groupe."
 "variable.albumartists_begin_locations" = "Les lieux où les artistes de l'album ont fait leurs débuts, généralement le lieu de naissance d'une personne ou le lieu de création d'un groupe."

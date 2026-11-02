@@ -1100,6 +1100,20 @@ class AdditionalArtistsDetailsOptionsPage(OptionsPage):
     TITLE = TxStrings.OPTIONS_PAGE_TITLE
     HELP_URL = USER_GUIDE_URL
 
+    OPTIONS = {
+        OPT_PROCESS_TRACKS: {'widgets': ['cb_process_tracks']},
+        OPT_AREA_COUNTY: {'widgets': ['cb_area_county']},
+        OPT_AREA_MUNICIPALITY: {'widgets': ['cb_area_municipality']},
+        OPT_AREA_SUBDIVISION: {'widgets': ['cb_area_subdivision']},
+        OPT_USE_CACHE: {'widgets': ['cb_use_cache']},
+        OPT_SAVE_ARTISTS_IN_CACHE: {'widgets': ['cb_save_artists']},
+        OPT_BACKGROUND_FETCH_AREAS: {'widgets': ['cb_use_background_processing']},
+        OPT_BACKGROUND_FETCH_INTERVAL: {'widgets': ['background_processing_interval']},
+        OPT_VERBOSE_LOG: {'widgets': ['cb_verbose_log']},
+        OPT_PURGE_ARTISTS: {'widgets': ['cb_flush_artists_cache']},
+        OPT_PURGE_ARTISTS_OLDER_THAN: {'widgets': ['artist_flush_interval']},
+    }
+
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
 
@@ -1829,18 +1843,73 @@ def enable(api: PluginApi) -> None:
         api (PluginApi): The api for the plugin.
     """
     # Initialize settings
-    api.plugin_config.register_option(OPT_PROCESS_TRACKS, False)
-    api.plugin_config.register_option(OPT_AREA_COUNTY, True)
-    api.plugin_config.register_option(OPT_AREA_MUNICIPALITY, True)
-    api.plugin_config.register_option(OPT_AREA_SUBDIVISION, True)
-    api.plugin_config.register_option(OPT_USE_CACHE, True)
-    api.plugin_config.register_option(OPT_SAVE_ARTISTS_IN_CACHE, True)
-    api.plugin_config.register_option(OPT_BACKGROUND_FETCH_AREAS, False)
-    api.plugin_config.register_option(OPT_BACKGROUND_FETCH_INTERVAL, DEFAULT_BACKGROUND_PROCESSING_INTERVAL)
-    api.plugin_config.register_option(OPT_VERBOSE_LOG, False)
+    api.plugin_config.register_option(
+        OPT_PROCESS_TRACKS,
+        False,
+        title=api.tr("ui.option.title.process_tracks", "Process tracks"),
+        in_profile=True,
+    )
+    api.plugin_config.register_option(
+        OPT_AREA_COUNTY,
+        True,
+        title=api.tr("ui.option.title.area_county", "Include county"),
+        in_profile=True,
+    )
+    api.plugin_config.register_option(
+        OPT_AREA_MUNICIPALITY,
+        True,
+        title=api.tr("ui.option.title.area_municipality", "Include municipality"),
+        in_profile=True,
+    )
+    api.plugin_config.register_option(
+        OPT_AREA_SUBDIVISION,
+        True,
+        title=api.tr("ui.option.title.area_subdivision", "Include subdivision"),
+        in_profile=True,
+    )
+    api.plugin_config.register_option(
+        OPT_USE_CACHE,
+        True,
+        title=api.tr("ui.option.title.use_cache", "Use cache database"),
+        in_profile=True,
+    )
+    api.plugin_config.register_option(
+        OPT_SAVE_ARTISTS_IN_CACHE,
+        True,
+        title=api.tr("ui.option.title.cache_artists", "Cache artists"),
+        in_profile=True,
+    )
+    api.plugin_config.register_option(
+        OPT_BACKGROUND_FETCH_AREAS,
+        False,
+        title=api.tr("ui.option.title.background_fetch", "Fetch missing areas"),
+        in_profile=True,
+    )
+    api.plugin_config.register_option(
+        OPT_BACKGROUND_FETCH_INTERVAL,
+        DEFAULT_BACKGROUND_PROCESSING_INTERVAL,
+        title=api.tr("ui.option.title.background_fetch_interval", "Fetch interval"),
+        in_profile=True,
+    )
+    api.plugin_config.register_option(
+        OPT_VERBOSE_LOG,
+        False,
+        title=api.tr("ui.option.title.verbose_log", "Verbose logging"),
+        in_profile=True,
+    )
+    api.plugin_config.register_option(
+        OPT_PURGE_ARTISTS,
+        False,
+        title=api.tr("ui.option.title.purge_artists", "Purge old artist records"),
+        in_profile=True,
+    )
+    api.plugin_config.register_option(
+        OPT_PURGE_ARTISTS_OLDER_THAN,
+        30,
+        title=api.tr("ui.option.title.purge_older_than", "Purge artist records age"),
+        in_profile=True,
+    )
     api.plugin_config.register_option(OPT_PURGE_LAST_CHECKED, '2026-01-01')
-    api.plugin_config.register_option(OPT_PURGE_ARTISTS, False)
-    api.plugin_config.register_option(OPT_PURGE_ARTISTS_OLDER_THAN, 30)
 
     # Migrate settings from 2.x version if available
     migrate_settings(api)
